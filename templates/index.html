@@ -1,52 +1,114 @@
 {% extends "base.html" %}
-{% block content %}
-
-<!-- <div class="container"> --> 
-
-
-      <div class="row">
-
-            <div class="box3 col-3">
-              {% for post in posts %}
-              <h3>{{ post.title }}</h3>   
-              <p>カテゴリー: {{ post.category.name }}</p>            
-              <h4>{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</h4>
-              {% endfor %}             
-              
-            </div>
-
-            <div class="box4 col-9">
-                <div>
-                  <article>
-                    {% for post in posts %}
-                      <div class="box5 mt-2">    
-                           
-                        <h2>{{ post.title }}</h2>
-                        <a href="/{{post.id}}/update" role="button">編集</a>
-                        <a href="/{{post.id}}/delete" role="button">削除</a>
-                        <p>カテゴリー: {{ post.category.name }}</p> 
-                        <p>作成日時: {{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
-                        <p>{{ post.body }}</p>
-                      </div>
-                      <div class="box6 mb-5"> 
-                        {% if post.image_url %}                        
-                        <img class="d-block mx-auto" src="{{ post.image_url }}" alt="Post Image" width="600" height="*">                        
-
-                        {% endif %}
-                      </div>
-                      {% endfor %}
-                  </article>
-                </div>  
-                
-                 <!-- Gradioチャットボットを表示する部分 -->
-      <div class="chatbot-box mt-5">
-        <h2>チャットボット</h2>
-        <iframe src="https://raiden-l534.onrender.com/" width="100%" height="600"></iframe>
-      </div>  
-
-            </div>
+{% block content %}      
+<section id="about" class="mb-5 text-center">
+    <h2 class="mb-3">バドミントンメンバー募集</h2>
+    <p class="lead">初級者～上級者どなたでも参加できます<br>
+        レベルが違っても楽しくゲームできる方<br>
+    未経験者はご相談ください。<br>
+                </p>
+    
+    <div class="row">
+        <div>
+            <h3>参加費</h3>
+            <p>初回1000円、2回目以降 600円（学生300円）</p>
+        </div>
+        <div>
+            <h3>練習場所</h3>
+            <p>北越谷体育館 越谷市立地域スポーツセンター<br>
+            〒343-0025 埼玉県越谷市大沢二丁目10番21号<br>
+            北越谷駅東口 徒歩7分</p>
+        </div>
     </div>
-  
-<!-- </div> -->
+</section>
+    <div class="container">       
+        <section id="schedule" class="mb-5">
+            <style>
+                .schedule {
+                  font-family: sans-serif;
+                  max-width: 800px;
+                  margin: 0 auto;
+                }
+                .schedule h1 {
+                  color: #333;
+                  margin-bottom: 20px;
+                }
+                .schedule h2 {
+                  color: #444;
+                  margin: 25px 0 15px;
+                  padding-bottom: 5px;
+                  border-bottom: 2px solid #eee;
+                }
+                .schedule ul {
+                  list-style: none;
+                  padding: 0;
+                }
+                .schedule li {
+                  padding: 10px;
+                  margin: 5px 0;
+                  background-color: #f8f9fa;
+                  border-radius: 4px;
+                }
+                .special-venue {
+                  color: #2c5282;
+                  font-weight: bold;
+                }
+              </style>
+              </head>
+              <body>
+              <div class="schedule">
+                <h1>練習予定</h1>
+                
+                <h2>2024年</h2>
+                <ul>
+                  <li>11月18日 月曜日 19:00-22:00 <span class="special-venue">春日部ウィングハットメインアリーナ 2面</span></li>
+                  <li>11月22日 金曜日 19:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
+                  <li>11月26日 火曜日 19:00-21:00 A面</li>
+                  <li>11月28日 木曜日 19:00-21:00 B面</li>
+                  <li>12月2日 月曜日 19:00-21:00 B面</li>
+                  <li>12月5日 木曜日 19:00-21:00 B面</li>
+                  <li>12月12日 木曜日 17:00-19:00 B面</li>
+                  <li>12月15日 日曜日 17:00-19:00 B面</li>
+                  <li>12月16日 月曜日 19:00-21:00 A面</li>
+                  <li>12月19日 木曜日 19:00-21:00 A面</li>
+                  <li>12月23日 月曜日 19:00-21:00 A面</li>
+                  <li>12月26日 木曜日 19:00-21:00 A面</li>
+                </ul>
+              
+                <h2>2025年</h2>
+                <ul>
+                  <li>1月5日 日曜日 17:00-19:00 A面</li>
+                  <li>1月6日 月曜日 19:00-21:00 B面</li>
+                  <li>1月9日 木曜日 19:00-21:00 B面</li>
+                  <li>1月16日 木曜日 19:00-21:00 B面</li>
+                  <li>1月20日 月曜日 19:00-21:00 A面</li>
+                  <li>2月8日 土曜日 18:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
+                </ul>       
 
+      </section>
+      <section id="contact" class="mb-5">
+        <h2 class="mb-3">連絡先</h2>
+        <div class="d-flex flex-column gap-3 mb-4" >
+            <a href="https://line.me/ti/p/gErDAMJEId" target="_blank" rel="noopener noreferrer" class="btn" style="background-color: #00B900; color: white; font-size: 1.5rem;"><b>LINEで連絡 ココをクリック</b></a>
+            <!-- <img src="images/line.jpg" alt="LINEのQRコード" width="200" height="200" class="img-fluid" loading="lazy"> -->
+        </div>
+
+        <p>渋谷: <a href="tel:07066330363">070-6633-0363</a><br>
+        e-mail: <a href="mailto:shibuyamasahiko@gmail.com">shibuyamasahiko@gmail.com</a></p>        
+        
+        <p>
+             <a href="https://x.com/rbn17pjAfz41575" target="_blank" rel="noopener noreferrer" class="btn btn-primary me-2">X（旧Twitter）</a>
+            <a href="https://www.instagram.com/kosigayabadminton/" target="_blank" rel="noopener noreferrer" class="btn btn-info">Instagram</a>
+        </p>
+    
+        
+      </section> 
+        
+        <!-- 中央寄せでレスポンシブ対応 -->
+        <div class="text-center">
+            <img src="/static/images/top.jpg" 
+                 alt="画像の説明" 
+                 class="img-fluid"
+                 style="max-width: 100%; height: auto;">
+        </div>
+    </div>
 {% endblock %}
