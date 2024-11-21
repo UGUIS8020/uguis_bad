@@ -44,10 +44,17 @@ def create_app():
         app.config['S3_LOCATION'] = f"https://{app.config['S3_BUCKET']}.s3.{aws_region}.amazonaws.com/"
         
         # AWS認証情報
+        # aws_credentials = {
+        #     'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
+        #     'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
+        #     'region_name': aws_region
+        # }
+
+           # AWS認証情報
         aws_credentials = {
             'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
             'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
-            'region_name': aws_region
+            'region_name': os.getenv("AWS_REGION")
         }
         
         # 必須環境変数のチェック
@@ -62,8 +69,7 @@ def create_app():
         app.dynamodb_resource = boto3.resource('dynamodb', **aws_credentials)
         
         # テーブル名の設定
-        # environment = os.getenv("ENVIRONMENT", "dev")
-        # app.table_name = f"{environment}-users"
+        
         app.table_name = os.getenv("TABLE_NAME")
         app.table = app.dynamodb_resource.Table(app.table_name)
 
