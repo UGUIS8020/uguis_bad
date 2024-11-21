@@ -2,16 +2,80 @@
 <html lang="ja">
 <head>
    
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>すずめ badminton</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
-
-    {% from "_formhelpers.html" import render_field %}
-    {% for message in get_flashed_messages() %}
-    {{ message }}
-    {% endfor %}
+        <!-- Google tag (gtag.js) -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HL8MJRHSX8"></script>
+      <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+  
+      gtag('config', 'G-HL8MJRHSX8');
+      </script>
+  
+  
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <!-- SEO改善のためのメタ情報強化 -->
+      <meta name="description" content="埼玉県げんごろう市の社会人バドミントンサークル「すずめ」。北げんごろう体育館で活動中。初心者歓迎！参加費1回600円～。げんごろう市、北げんごろう、南げんごろう、新げんごろうエリアで活動するアットホームなバドミントンチームです。見学・体験随時募集中！">
+      <meta name="keywords" content="げんごろう市,バドミントン,サークル,北げんごろう,南げんごろう,新げんごろう,社会人,初心者歓迎,体育館,スポーツ,運動,趣味,バドミントンコート,練習会">
+      <title>すずめ｜げんごろう市バドミントンサークル</title>
+      
+      <!-- Open Graph メタタグの強化 -->
+      <meta property="og:title" content="げんごろう市バドミントンサークル｜すずめ｜初心者歓迎！">
+      <meta property="og:description" content="埼玉県げんごろう市の社会人バドミントンサークル。げんごろう市立地域スポーツセンターで活動中。初心者歓迎！参加費1回600円～。アットホームな雰囲気で楽しくバドミントンを始めませんか？">
+      <meta property="og:image" content="https://badminton.shibuya8020.com/images/001.jpg">
+      <meta property="og:url" content="https://badminton.shibuya8020.com/">
+      <meta property="og:type" content="website">
+      <meta property="og:site_name" content="すずめ">
+      <meta property="og:locale" content="ja_JP">
+  
+      <!-- 検索エンジン向けの追加情報 -->
+      <link rel="canonical" href="https://badminton.shibuya8020.com/">
+      <meta name="geo.region" content="JP-11">
+      <meta name="geo.placename" content="げんごろう市">
+      
+      <!-- CSS -->
+      <link rel="stylesheet" href="style.css">
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+      <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+      <link rel="icon" href="images/favicon.ico">
+  
+      <!-- 構造化データ -->
+      <script type="application/ld+json">
+      {
+          "@context": "https://schema.org",
+          "@type": "SportsTeam",
+          "name": "すずめ",
+          "description": "埼玉県げんごろう市の社会人バドミントンサークル。初心者から経験者まで歓迎！",
+          "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "げんごろう市",
+              "addressRegion": "埼玉県",
+              "postalCode": "343-0025",
+              "streetAddress": "大沢二丁目10番21号"
+          },
+          "location": {
+              "@type": "Place",
+              "name": "北げんごろう体育館 げんごろう市立地域スポーツセンター",
+              "address": {
+                  "@type": "PostalAddress",
+                  "addressLocality": "げんごろう市",
+                  "addressRegion": "埼玉県",
+                  "postalCode": "343-0025",
+                  "streetAddress": "大沢二丁目10番21号"
+              }
+          },
+          "sport": "バドミントン",
+          "url": "https://badminton.shibuya8020.com/",
+          "sameAs": [
+              "https://x.com/rbn17pjAfz41575",
+              "https://www.instagram.com/kosigayabadminton/"
+          ],
+          "telephone": "070-6633-0363",
+          "email": "shibuyamasahiko@gmail.com",
+          "priceRange": "600-1000円"
+      }
+      </script>       
 
     <style>
         body {
@@ -78,6 +142,7 @@
 
 </head>
 
+<body>
 
   <header>
     <nav class="navbar navbar-expand-lg bg-body-tertiary fixed-top" data-bs-theme="dark">
@@ -135,7 +200,12 @@
       </div> -->
   </header>
 
-<body>
+  {% from "_formhelpers.html" import render_field %}
+  {% for message in get_flashed_messages() %}
+  <div class="alert alert-info">{{ message }}</div>
+  {% endfor %}
+
+
   
 
     {% block content %}
