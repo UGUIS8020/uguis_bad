@@ -62,8 +62,9 @@ def create_app():
         app.dynamodb_resource = boto3.resource('dynamodb', **aws_credentials)
         
         # テーブル名の設定
-        environment = os.getenv("ENVIRONMENT", "dev")
-        app.table_name = f"{environment}-users"
+        # environment = os.getenv("ENVIRONMENT", "dev")
+        # app.table_name = f"{environment}-users"
+        app.table_name = os.getenv("TABLE_NAME")
         app.table = app.dynamodb_resource.Table(app.table_name)
 
         # Flask-Loginの設定
