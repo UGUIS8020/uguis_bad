@@ -640,10 +640,6 @@ def account(user_id):
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('データベースエラーが発生しました。', 'error')
         return redirect(url_for('user_maintenance'))
-
-
-    
-
                             
 
 @app.route("/<int:id>/delete")
