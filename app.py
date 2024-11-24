@@ -353,30 +353,10 @@ class LoginForm(FlaskForm):
         return self.user    
 
 
-# @app.route("/")
-# def index(): 
-#         app.logger.info(f"User ID: {current_user.get_id() if current_user.is_authenticated else 'Anonymous'}, is_authenticated: {current_user.is_authenticated}")      
-#         app.logger.debug(f"Accessing index - User ID: {current_user.get_id()}, is_authenticated: {current_user.is_authenticated}")
-#         return render_template("index.html", posts=[])
-
-# @app.route("/", methods=['GET', 'POST'])
-# def index(): 
-#         form = ScheduleForm()
-#         if form.validate_on_submit():
-#             session['date'] = form.date.data.isoformat()
-#             session['venue'] = form.venue.data
-#             session['start_time'] = form.start_time.data
-#             session['end_time'] = form.end_time.data
-
-#             flash('スケジュールが登録されました', 'success')
-#             return redirect(url_for('index'))
-#         app.logger.info(f"User ID: {current_user.get_id() if current_user.is_authenticated else 'Anonymous'}, is_authenticated: {current_user.is_authenticated}")      
-#         app.logger.debug(f"Accessing index - User ID: {current_user.get_id()}, is_authenticated: {current_user.is_authenticated}")
-#         return render_template("index.html", form=form)
 
 def get_schedule_table():
-    """スケジュールテーブルを取得"""
-    return app.tables.get("schedule")
+    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')  # 必要に応じてリージョンを変更
+    return dynamodb.Table('schedule')  # テーブル名を正しく設定
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
