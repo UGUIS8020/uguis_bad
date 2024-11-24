@@ -82,132 +82,153 @@
                   <li>1月20日 月曜日 19:00-21:00 A面</li>
                   <li>1月23日 木曜日 19:00-21:00 A面</li>
                   <li>2月8日 土曜日 18:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
-                </ul>       
+                </ul>    
+                
+                <h2>TEST</h2>
+                <ul>
+                  <li>1月5日 日曜日 17:00-19:00 A面</li>
+                  <li>1月6日 月曜日 19:00-21:00 B面</li>
+                  <li>1月9日 木曜日 19:00-21:00 B面</li>                  
+                  <li>1月14日 火曜日 19:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
+                  <li>1月16日 木曜日 19:00-21:00 B面</li>
+                  <li>1月20日 月曜日 19:00-21:00 A面</li>
+                  <li>1月23日 木曜日 19:00-21:00 A面</li>
+                  <li>2月8日 土曜日 18:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
+                </ul>                        
+                                        
+          
+            
 
                 {% if current_user.is_authenticated and current_user.is_administrator %}     
 
                 <div class="bg-white rounded-lg shadow p-6">
                   <h1 class="text-2xl font-bold mb-6">練習スケジュール編集</h1>
-                </div>                  
-                <form method="post" class="p-4">
+              </div>
+              
+              <form method="post" class="p-4">
+                  {{ form.hidden_tag() }}
+                  
+                  <!-- 日付 -->
                   <div class="mb-4">
-                      <label for="date" class="block mb-2 font-medium">日付</label>
-                      <input type="date" name="date" id="date" class="w-full p-2 border rounded" required>
+                      {{ form.date.label(class="block mb-2 font-medium") }}
+                      {{ form.date(class="w-full p-2 border rounded", required=true) }}
+                      {% if form.date.errors %}
+                          {% for error in form.date.errors %}
+                              <p class="mt-1 text-sm text-red-500">{{ error }}</p>
+                          {% endfor %}
+                      {% endif %}
                   </div>
               
+                  <!-- 曜日（自動入力） -->
                   <div class="mb-4">
-                      <label for="dayOfWeek" class="block mb-2 font-medium">曜日</label>
-                      <input type="text" name="dayOfWeek" id="dayOfWeek" class="w-full p-2 border rounded bg-gray-100" readonly>
+                      {{ form.day_of_week.label(class="block mb-2 font-medium") }}
+                      {{ form.day_of_week(class="w-full p-2 border rounded bg-gray-100", readonly=true) }}
                   </div>
               
+                  <!-- 会場 -->
                   <div class="mb-4">
-                      <label for="venue" class="block mb-2 font-medium">会場</label>
-                      <select name="venue" id="venue" class="w-full p-2 border rounded" required>
-                          <option value="">選択してください</option>
-                          <optgroup label="通常会場">
-                              <option value="normal-a">北越谷 A面</option>
-                              <option value="normal-b">北越谷 B面</option>
-                          </optgroup>
-                          <optgroup label="特別会場">
-                              <option value="koshigaya">越谷総合体育館 第1体育室</option>
-                              <option value="winghat">ウィングハット</option>
-                          </optgroup>
-                      </select>
+                      {{ form.venue.label(class="block mb-2 font-medium") }}
+                      {{ form.venue(class="w-full p-2 border rounded", required=true) }}
+                      {% if form.venue.errors %}
+                          {% for error in form.venue.errors %}
+                              <p class="mt-1 text-sm text-red-500">{{ error }}</p>
+                          {% endfor %}
+                      {% endif %}
                   </div>
               
+                  <!-- 開始時間 -->
                   <div class="mb-4">
-                      <label for="startTime" class="block mb-2 font-medium">開始時間</label>
-                      <select name="startTime" id="startTime" class="w-full p-2 border rounded" required>
-                          <option value="">選択してください</option>
-                          <option value="09:00">09:00</option>
-                          <option value="10:00">10:00</option>
-                          <option value="11:00">11:00</option>
-                          <option value="12:00">12:00</option>
-                          <option value="13:00">13:00</option>
-                          <option value="14:00">14:00</option>
-                          <option value="15:00">15:00</option>
-                          <option value="16:00">16:00</option>
-                          <option value="17:00">17:00</option>
-                          <option value="18:00">18:00</option>
-                          <option value="19:00">19:00</option>
-                          <option value="20:00">20:00</option>
-                          <option value="21:00">21:00</option>
-                          <option value="22:00">22:00</option>
-                      </select>
+                      {{ form.start_time.label(class="block mb-2 font-medium") }}
+                      {{ form.start_time(class="w-full p-2 border rounded", required=true) }}
+                      {% if form.start_time.errors %}
+                          {% for error in form.start_time.errors %}
+                              <p class="mt-1 text-sm text-red-500">{{ error }}</p>
+                          {% endfor %}
+                      {% endif %}
                   </div>
               
+                  <!-- 終了時間 -->
                   <div class="mb-4">
-                      <label for="endTime" class="block mb-2 font-medium">終了時間</label>
-                      <select name="endTime" id="endTime" class="w-full p-2 border rounded" required>
-                          <option value="">選択してください</option>
-                      </select>
+                      {{ form.end_time.label(class="block mb-2 font-medium") }}
+                      {{ form.end_time(class="w-full p-2 border rounded", required=true) }}
+                      {% if form.end_time.errors %}
+                          {% for error in form.end_time.errors %}
+                              <p class="mt-1 text-sm text-red-500">{{ error }}</p>
+                          {% endfor %}
+                      {% endif %}
                   </div>
               
+                  <!-- 送信ボタン -->
                   <div class="flex justify-center pt-4">
-                    <button type="submit" class="px-8 py-3 text-xl font-extrabold tracking-wider text-black bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform transition-all duration-200 hover:scale-105">
-                        登録
-                    </button>
-                </div>
+                      <!-- {{ form.submit(class="px-8 py-3 text-xl font-extrabold tracking-wider text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform transition-all duration-200 hover:scale-105") }} -->
+                      {{ form.submit }}
+                    </div>
               </form>
               
+              <!-- 日付処理のJavaScript -->
               <script>
-              // 日付から曜日を取得する関数
-              function getJapaneseDayOfWeek(date) {
-                  const days = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
-                  return days[date.getDay()];
-              }
-              
-              // 日付入力時に曜日を自動設定
-              document.getElementById('date').addEventListener('change', function() {
-                  const selectedDate = new Date(this.value);
-                  const dayOfWeek = getJapaneseDayOfWeek(selectedDate);
-                  document.getElementById('dayOfWeek').value = dayOfWeek;
-              });
-              
-              // 開始時間の選択に応じて終了時間の選択肢を制限
-              document.getElementById('startTime').addEventListener('change', function() {
-                  const startTime = this.value;
-                  const endTimeSelect = document.getElementById('endTime');
-                  const startHour = parseInt(startTime.split(':')[0]);
-                  
-                  endTimeSelect.innerHTML = '<option value="">選択してください</option>';
-                  
-                  for (let i = startHour + 1; i <= 23; i++) {
-                      const timeStr = `${i.toString().padStart(2, '0')}:00`;
-                      const option = new Option(timeStr, timeStr);
-                      endTimeSelect.add(option);
-                  }
-              });
-              
-              // ページ読み込み時の初期設定
-              window.addEventListener('load', function() {
+              document.addEventListener('DOMContentLoaded', function() {
                   const dateInput = document.getElementById('date');
-                  if (dateInput.value) {
-                      const selectedDate = new Date(dateInput.value);
-                      const dayOfWeek = getJapaneseDayOfWeek(selectedDate);
-                      document.getElementById('dayOfWeek').value = dayOfWeek;
+                  const dayOfWeekInput = document.getElementById('day_of_week');
+                  const startTimeSelect = document.getElementById('start_time');
+                  const endTimeSelect = document.getElementById('end_time');
+              
+                  // 曜日の自動入力
+                  function updateDayOfWeek() {
+                      if (dateInput.value) {
+                          const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+                          const date = new Date(dateInput.value);
+                          const dayOfWeek = weekDays[date.getDay()];
+                          dayOfWeekInput.value = `${dayOfWeek}曜日`;
+              
+                          // 曜日に応じて背景色を変更（土日の場合）
+                          if (date.getDay() === 0) { // 日曜日
+                              dayOfWeekInput.classList.add('bg-red-50');
+                              dayOfWeekInput.classList.remove('bg-blue-50', 'bg-gray-100');
+                              dayOfWeekInput.style.color = '#E53E3E';  // 赤色テキスト
+                          } else if (date.getDay() === 6) { // 土曜日
+                              dayOfWeekInput.classList.add('bg-blue-50');
+                              dayOfWeekInput.classList.remove('bg-red-50', 'bg-gray-100');
+                              dayOfWeekInput.style.color = '#3182CE';  // 青色テキスト
+                          } else { // 平日
+                              dayOfWeekInput.classList.add('bg-gray-100');
+                              dayOfWeekInput.classList.remove('bg-red-50', 'bg-blue-50');
+                              dayOfWeekInput.style.color = '#2D3748';  // デフォルトの文字色
+                          }
+                      } else {
+                          dayOfWeekInput.value = '';
+                          dayOfWeekInput.classList.remove('bg-red-50', 'bg-blue-50');
+                          dayOfWeekInput.classList.add('bg-gray-100');
+                      }
                   }
-              });
               
-              // フォームデータを送信する前の処理
-              document.querySelector('form').addEventListener('submit', function(e) {
-                  e.preventDefault();
-                  
-                  // フォームデータの収集
-                  const formData = {
-                      date: document.getElementById('date').value,
-                      dayOfWeek: document.getElementById('dayOfWeek').value,
-                      venue: document.getElementById('venue').value,
-                      startTime: document.getElementById('startTime').value,
-                      endTime: document.getElementById('endTime').value,
-                  };
+                  // 日付入力時に曜日を自動更新
+                  dateInput.addEventListener('change', updateDayOfWeek);
+                  // ページ読み込み時に曜日を設定（既存の日付がある場合）
+                  updateDayOfWeek();
               
-                  // ここでバックエンドにデータを送信する処理を追加
-                  console.log('送信データ:', formData);
+                  // 開始時間が変更されたときの終了時間の更新
+                  startTimeSelect.addEventListener('change', function() {
+                      if (this.value) {
+                          const selectedHour = parseInt(this.value.split(':')[0]);
+                          
+                          // 終了時間の選択肢を更新
+                          endTimeSelect.innerHTML = '<option value="">選択してください</option>';
+                          for (let i = selectedHour + 1; i <= 23; i++) {
+                              const timeStr = `${i.toString().padStart(2, '0')}:00`;
+                              const option = new Option(timeStr, timeStr);
+                              endTimeSelect.add(option);
+                          }
+                      } else {
+                          endTimeSelect.innerHTML = '<option value="">選択してください</option>';
+                      }
+                  });
               });
               </script>
 
               {% endif %}
+
+              
                   
 
       </section>

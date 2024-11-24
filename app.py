@@ -353,11 +353,55 @@ class LoginForm(FlaskForm):
         return self.user    
 
 
-@app.route("/")
+# @app.route("/")
+# def index(): 
+#         app.logger.info(f"User ID: {current_user.get_id() if current_user.is_authenticated else 'Anonymous'}, is_authenticated: {current_user.is_authenticated}")      
+#         app.logger.debug(f"Accessing index - User ID: {current_user.get_id()}, is_authenticated: {current_user.is_authenticated}")
+#         return render_template("index.html", posts=[])
+
+@app.route("/", methods=['GET', 'POST'])
 def index(): 
+        form = ScheduleForm()
+        if form.validate_on_submit():
+            session['date'] = form.date.data.isoformat()
+            session['venue'] = form.venue.data
+            session['start_time'] = form.start_time.data
+            session['end_time'] = form.end_time.data
+
+            flash('スケジュールが登録されました', 'success')
+            return redirect(url_for('index'))
         app.logger.info(f"User ID: {current_user.get_id() if current_user.is_authenticated else 'Anonymous'}, is_authenticated: {current_user.is_authenticated}")      
         app.logger.debug(f"Accessing index - User ID: {current_user.get_id()}, is_authenticated: {current_user.is_authenticated}")
-        return render_template("index.html", posts=[])
+        return render_template("index.html", form=form)
+
+class ScheduleForm(FlaskForm):
+    date = DateField('日付', validators=[DataRequired()])
+    day_of_week = StringField('曜日', render_kw={'readonly': True})  # 自動入力用
+    
+    venue = SelectField('会場', validators=[DataRequired()], choices=[
+        ('', '選択してください'),
+        ('normal-a', '北越谷 A面'),
+        ('normal-b', '北越谷 B面'),
+        ('koshigaya', '越谷総合体育館 第1体育室'),
+        ('winghat', 'ウィングハット')
+    ])
+    
+    start_time = SelectField('開始時間', validators=[DataRequired()], choices=[
+        ('', '選択してください')] + 
+        [(f"{h:02d}:00", f"{h:02d}:00") for h in range(9, 23)]
+    )
+    
+    end_time = SelectField('終了時間', validators=[DataRequired()], choices=[
+        ('', '選択してください')] + 
+        [(f"{h:02d}:00", f"{h:02d}:00") for h in range(10, 24)]
+    )
+    
+    submit = SubmitField('登録')
+
+
+
+
+
     
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -639,8 +683,7 @@ def account(user_id):
     except ClientError as e:
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('データベースエラーが発生しました。', 'error')
-        return redirect(url_for('user_maintenance'))
-                            
+        return redirect(url_for('user_maintenance'))                              
 
 @app.route("/<int:id>/delete")
 # @login_required
