@@ -55,7 +55,7 @@ def create_app():
             'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
             'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
             'region_name': os.getenv("AWS_REGION")
-        }
+        }       
         
         # 必須環境変数のチェック
         required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET"]
@@ -359,20 +359,59 @@ class LoginForm(FlaskForm):
 #         app.logger.debug(f"Accessing index - User ID: {current_user.get_id()}, is_authenticated: {current_user.is_authenticated}")
 #         return render_template("index.html", posts=[])
 
+# @app.route("/", methods=['GET', 'POST'])
+# def index(): 
+#         form = ScheduleForm()
+#         if form.validate_on_submit():
+#             session['date'] = form.date.data.isoformat()
+#             session['venue'] = form.venue.data
+#             session['start_time'] = form.start_time.data
+#             session['end_time'] = form.end_time.data
+
+#             flash('スケジュールが登録されました', 'success')
+#             return redirect(url_for('index'))
+#         app.logger.info(f"User ID: {current_user.get_id() if current_user.is_authenticated else 'Anonymous'}, is_authenticated: {current_user.is_authenticated}")      
+#         app.logger.debug(f"Accessing index - User ID: {current_user.get_id()}, is_authenticated: {current_user.is_authenticated}")
+#         return render_template("index.html", form=form)
+
+def get_schedule_table():
+    """スケジュールテーブルを取得"""
+    return app.tables.get("schedule")
+
 @app.route("/", methods=['GET', 'POST'])
-def index(): 
-        form = ScheduleForm()
-        if form.validate_on_submit():
-            session['date'] = form.date.data.isoformat()
-            session['venue'] = form.venue.data
-            session['start_time'] = form.start_time.data
-            session['end_time'] = form.end_time.data
+def index():
+    form = ScheduleForm()
+    if form.validate_on_submit():
+        try:
+            # スケジュールテーブルの取得
+            schedule_table = get_schedule_table()
+            if not schedule_table:
+                raise ValueError("Schedule table is not initialized")
+
+            # スケジュールデータの作成
+            schedule_data = {
+                'schedule_id': str(uuid.uuid4()),  # ユニークID
+                'date': form.date.data.isoformat(),  # 日付
+                'day_of_week': form.day_of_week.data,  # 曜日
+                'venue': form.venue.data,  # 会場
+                'start_time': form.start_time.data,  # 開始時間
+                'end_time': form.end_time.data,  # 終了時間
+                'created_at': datetime.now().isoformat(),  # 作成日時
+                'user_id': current_user.get_id() if current_user.is_authenticated else 'anonymous',  # ユーザーID
+                'status': 'active'  # ステータス
+            }
+
+            # DynamoDBに保存
+            schedule_table.put_item(Item=schedule_data)
 
             flash('スケジュールが登録されました', 'success')
             return redirect(url_for('index'))
-        app.logger.info(f"User ID: {current_user.get_id() if current_user.is_authenticated else 'Anonymous'}, is_authenticated: {current_user.is_authenticated}")      
-        app.logger.debug(f"Accessing index - User ID: {current_user.get_id()}, is_authenticated: {current_user.is_authenticated}")
-        return render_template("index.html", form=form)
+
+        except Exception as e:
+            app.logger.error(f"スケジュール登録エラー: {str(e)}")
+            flash('スケジュールの登録中にエラーが発生しました', 'error')
+    
+    return render_template("index.html", form=form)
 
 class ScheduleForm(FlaskForm):
     date = DateField('日付', validators=[DataRequired()])
