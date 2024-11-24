@@ -60,12 +60,11 @@
                 
                 <h2>2024年</h2>
                 <ul>
-                  <li>11月22日 金曜日 19:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
                   <li>11月26日 火曜日 19:00-21:00 A面</li>
                   <li>11月28日 木曜日 19:00-21:00 B面</li>
                   <li>12月2日 月曜日 19:00-21:00 B面</li>
                   <li>12月5日 木曜日 19:00-21:00 B面</li>
-                  <li>12月12日 木曜日 17:00-19:00 B面</li>
+                  <li>12月12日 木曜日 19:00-21:00 B面</li>
                   <li>12月15日 日曜日 17:00-19:00 B面</li>
                   <li>12月16日 月曜日 19:00-21:00 A面</li>
                   <li>12月19日 木曜日 19:00-21:00 A面</li>
@@ -81,8 +80,11 @@
                   <li>1月14日 火曜日 19:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
                   <li>1月16日 木曜日 19:00-21:00 B面</li>
                   <li>1月20日 月曜日 19:00-21:00 A面</li>
+                  <li>1月23日 木曜日 19:00-21:00 A面</li>
                   <li>2月8日 土曜日 18:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
                 </ul>       
+
+                {% if current_user.is_authenticated and current_user.is_administrator %}     
 
                 <div class="bg-white rounded-lg shadow p-6">
                   <h1 class="text-2xl font-bold mb-6">練習スケジュール編集</h1>
@@ -204,6 +206,8 @@
                   console.log('送信データ:', formData);
               });
               </script>
+
+              {% endif %}
                   
 
       </section>
