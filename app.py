@@ -43,14 +43,7 @@ def create_app():
         aws_region = os.getenv("AWS_REGION", "ap-northeast-1")
         app.config['S3_LOCATION'] = f"https://{app.config['S3_BUCKET']}.s3.{aws_region}.amazonaws.com/"
         
-        # AWS認証情報
-        # aws_credentials = {
-        #     'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
-        #     'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
-        #     'region_name': aws_region
-        # }
-
-           # AWS認証情報
+        
         aws_credentials = {
             'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
             'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
@@ -69,9 +62,12 @@ def create_app():
         app.dynamodb_resource = boto3.resource('dynamodb', **aws_credentials)
         
         # テーブル名の設定
-        
         app.table_name = os.getenv("TABLE_NAME")
-        app.table = app.dynamodb_resource.Table(app.table_name)
+        app.table_name_schedule = os.getenv("TABLE_NAME_SCHEDULE")
+
+        # DynamoDBリソースからテーブルを取得
+        app.table = app.dynamodb_resource.Table(app.table_name)  # "bad-users"
+        app.table_schedule = app.dynamodb_resource.Table(app.table_name_schedule)  # "Schedule"
 
         # Flask-Loginの設定
         login_manager.init_app(app)
@@ -355,8 +351,13 @@ class LoginForm(FlaskForm):
 
 
 def get_schedule_table():
-    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')  # 必要に応じてリージョンを変更
-    return dynamodb.Table('schedule')  # テーブル名を正しく設定
+    # .envからリージョンとテーブル名を取得
+    region = os.getenv('AWS_REGION')  # デフォルト値を設定
+    table_name = os.getenv('TABLE_NAME_SCHEDULE', 'Schedule')  # デフォルト値を設定
+
+    # DynamoDBリソースを初期化してテーブルを返す
+    dynamodb = boto3.resource('dynamodb', region_name=region)
+    return dynamodb.Table(table_name)
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
@@ -368,7 +369,6 @@ def index():
             if not schedule_table:
                 raise ValueError("Schedule table is not initialized")
 
-            # スケジュールデータの作成
             schedule_data = {
                 'schedule_id': str(uuid.uuid4()),  # ユニークID
                 'date': form.date.data.isoformat(),  # 日付
@@ -376,6 +376,7 @@ def index():
                 'venue': form.venue.data,  # 会場
                 'start_time': form.start_time.data,  # 開始時間
                 'end_time': form.end_time.data,  # 終了時間
+                'venue_date': f"{form.venue.data}#{form.date.data.isoformat()}",  # 必須: 会場と日付を組み合わせ
                 'created_at': datetime.now().isoformat(),  # 作成日時
                 'user_id': current_user.get_id() if current_user.is_authenticated else 'anonymous',  # ユーザーID
                 'status': 'active'  # ステータス
@@ -418,7 +419,78 @@ class ScheduleForm(FlaskForm):
     submit = SubmitField('登録')
 
 
+# def get_schedule_table():
+#     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
+#     return dynamodb.Table('Schedule')
 
+# # スケジュール一覧と入力ページ
+# @app.route('/', methods=['GET', 'POST'])
+# def index():
+#     table = get_schedule_table()
+
+#     # POSTリクエストで新しいスケジュールを追加
+#     if request.method == 'POST':
+#         # フォームデータを取得
+#         date = request.form['date']
+#         day_of_week = request.form['day_of_week']
+#         venue = request.form['venue']
+#         start_time = request.form['start_time']
+#         end_time = request.form['end_time']
+#         user_id = 'anonymous'  # 本来は認証されたユーザーのIDを使用
+
+#         # データ構造を作成
+#         schedule_data = {
+#             'schedule_id': str(uuid.uuid4()),
+#             'date': date,
+#             'day_of_week': day_of_week,
+#             'venue': venue,
+#             'start_time': start_time,
+#             'end_time': end_time,
+#             'venue_date': f"{venue}#{date}",
+#             'created_at': datetime.now().isoformat(),
+#             'user_id': user_id,
+#             'status': 'active'
+#         }
+
+#         # DynamoDBに登録
+#         try:
+#             table.put_item(Item=schedule_data)
+#         except Exception as e:
+#             app.logger.error(f"スケジュール登録エラー: {str(e)}")
+
+#         # リダイレクトしてフォームをリセット
+#         return redirect(url_for('index'))
+
+#     # GETリクエストでスケジュール一覧を表示
+#     schedules = []
+#     try:
+#         response = table.scan()
+#         schedules = response.get('Items', [])
+#     except Exception as e:
+#         app.logger.error(f"スケジュール取得エラー: {str(e)}")
+
+#     return render_template('index.html', schedules=schedules)
+
+@app.route('/edit_schedule/<string:schedule_id>', methods=['GET', 'POST'])
+def edit_schedule(schedule_id):
+    # DynamoDBからスケジュールを取得して編集ページを表示
+    table = get_schedule_table()
+
+    if request.method == 'POST':
+        # フォームデータを取得してスケジュールを更新
+        new_data = {
+            'start_time': request.form['start_time'],
+            'end_time': request.form['end_time']
+        }
+        table.update_item(
+            Key={'schedule_id': schedule_id},
+            UpdateExpression="SET start_time = :start, end_time = :end",
+            ExpressionAttributeValues={
+                ':start': new_data['start_time'],
+                ':end': new_data['end_time']
+            }
+        )
+        return redirect(url_for('index'))
 
 
     
