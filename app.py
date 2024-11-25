@@ -346,46 +346,8 @@ class LoginForm(FlaskForm):
 
     def get_user(self):
         """ログイン成功時のユーザー情報を返す"""
-        return self.user   
+        return self.user  
 
-
-    
-
-
-# @app.route("/", methods=['GET', 'POST'])
-# def index():
-#     form = ScheduleForm()
-#     if form.validate_on_submit():
-#         try:
-#             # スケジュールテーブルの取得
-#             schedule_table = get_schedule_table()
-#             if not schedule_table:
-#                 raise ValueError("Schedule table is not initialized")
-
-#             schedule_data = {
-#                 'schedule_id': str(uuid.uuid4()),  # ユニークID
-#                 'date': form.date.data.isoformat(),  # 日付
-#                 'day_of_week': form.day_of_week.data,  # 曜日
-#                 'venue': form.venue.data,  # 会場
-#                 'start_time': form.start_time.data,  # 開始時間
-#                 'end_time': form.end_time.data,  # 終了時間
-#                 'venue_date': f"{form.venue.data}#{form.date.data.isoformat()}",  # 必須: 会場と日付を組み合わせ
-#                 'created_at': datetime.now().isoformat(),  # 作成日時
-#                 'user_id': current_user.get_id() if current_user.is_authenticated else 'anonymous',  # ユーザーID
-#                 'status': 'active'  # ステータス
-#             }
-
-#             # DynamoDBに保存
-#             schedule_table.put_item(Item=schedule_data)
-
-#             flash('スケジュールが登録されました', 'success')
-#             return redirect(url_for('index'))
-
-#         except Exception as e:
-#             app.logger.error(f"スケジュール登録エラー: {str(e)}")
-#             flash('スケジュールの登録中にエラーが発生しました', 'error')
-    
-#     return render_template("index.html", form=form, schedules=schedules)
 
 class ScheduleForm(FlaskForm):
     date = DateField('日付', validators=[DataRequired()])
@@ -471,9 +433,12 @@ def get_schedules_with_formatting():
     response = schedule_table.scan()
     schedules = []
     for schedule in response.get('Items', []):
-        schedule['formatted_date'] = datetime.strptime(
-            schedule['date'], "%Y-%m-%d"
-        ).strftime("%Y %m月%d日")
+        date_obj = datetime.strptime(schedule['date'], "%Y-%m-%d")
+        
+        # 月と日をゼロ埋めしない形式で取得
+        formatted_date = f"{date_obj.month}月{date_obj.day}日"
+        schedule['formatted_date'] = formatted_date
+        
         schedules.append(schedule)
 
     return schedules
@@ -751,40 +716,6 @@ def edit_schedule(schedule_id):
     
     return render_template('edit_schedule.html', form=form, schedule_id=schedule_id)
 
-
-# @app.route("/edit_schedule/<schedule_id>", methods=['GET', 'POST'])
-# def edit_schedule(schedule_id):
-#     form = ScheduleForm()
-#     try:
-#         table = get_schedule_table()
-        
-#         # まず schedule_id で scan して venue_date を取得
-#         response = table.scan(
-#             FilterExpression='schedule_id = :sid',
-#             ExpressionAttributeValues={
-#                 ':sid': schedule_id
-#             }
-#         )
-#         items = response.get('Items', [])
-        
-#         if items:
-#             schedule = items[0]  # 最初のマッチしたアイテムを使用
-#             if request.method == 'GET':
-#                 form.date.data = datetime.strptime(schedule['date'], '%Y-%m-%d').date()
-#                 form.day_of_week.data = schedule['day_of_week']
-#                 form.venue.data = schedule['venue']
-#                 form.start_time.data = schedule['start_time']
-#                 form.end_time.data = schedule['end_time']
-#         else:
-#             flash('スケジュールが見つかりません', 'error')
-#             return redirect(url_for('index'))
-            
-#     except ClientError as e:
-#         app.logger.error(f"スケジュール取得エラー: {str(e)}")
-#         flash('スケジュールの取得中にエラーが発生しました', 'error')
-#         return redirect(url_for('index'))
-    
-#     return render_template('edit_schedule.html', form=form, schedule_id=schedule_id)
 
 @app.route("/delete_schedule/<schedule_id>", methods=['POST'])
 def delete_schedule(schedule_id):
