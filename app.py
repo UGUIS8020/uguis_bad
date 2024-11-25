@@ -346,18 +346,11 @@ class LoginForm(FlaskForm):
 
     def get_user(self):
         """ログイン成功時のユーザー情報を返す"""
-        return self.user    
+        return self.user   
 
 
+    
 
-def get_schedule_table():
-    # .envからリージョンとテーブル名を取得
-    region = os.getenv('AWS_REGION')  # デフォルト値を設定
-    table_name = os.getenv('TABLE_NAME_SCHEDULE', 'Schedule')  # デフォルト値を設定
-
-    # DynamoDBリソースを初期化してテーブルを返す
-    dynamodb = boto3.resource('dynamodb', region_name=region)
-    return dynamodb.Table(table_name)
 
 # @app.route("/", methods=['GET', 'POST'])
 # def index():
@@ -443,8 +436,7 @@ def index():
                 'start_time': form.start_time.data,        # そのまま HH:MM 形式で保存
                 'end_time': form.end_time.data,           # そのまま HH:MM 形式で保存
                 'venue_date': f"{form.venue.data}#{form.date.data.isoformat()}",
-                'created_at': datetime.now().isoformat(),
-                'user_id': current_user.get_id() if current_user.is_authenticated else 'anonymous',
+                'created_at': datetime.now().isoformat(),                
                 'status': 'active'
             }
 
@@ -485,30 +477,7 @@ def get_schedules_with_formatting():
         schedules.append(schedule)
 
     return schedules
-
-@app.route('/edit_schedule/<string:schedule_id>', methods=['GET', 'POST'])
-def edit_schedule(schedule_id):
-    # DynamoDBからスケジュールを取得して編集ページを表示
-    table = get_schedule_table()
-
-    if request.method == 'POST':
-        # フォームデータを取得してスケジュールを更新
-        new_data = {
-            'start_time': request.form['start_time'],
-            'end_time': request.form['end_time']
-        }
-        table.update_item(
-            Key={'schedule_id': schedule_id},
-            UpdateExpression="SET start_time = :start, end_time = :end",
-            ExpressionAttributeValues={
-                ':start': new_data['start_time'],
-                ':end': new_data['end_time']
-            }
-        )
-        return redirect(url_for('index'))
-
-
-    
+  
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -694,6 +663,172 @@ def logout():
     logout_user()
     return redirect("/login")
 
+def get_schedule_table():
+    # デバッグログを追加
+    region = os.getenv('AWS_REGION')
+    table_name = os.getenv('TABLE_NAME_SCHEDULE', 'Schedule')
+    
+    app.logger.debug(f"Region: {region}")
+    app.logger.debug(f"Table name: {table_name}")
+    
+    dynamodb = boto3.resource('dynamodb', region_name=region)
+    return dynamodb.Table(table_name) 
+
+
+@app.route("/edit_schedule/<schedule_id>", methods=['GET', 'POST'])
+def edit_schedule(schedule_id):
+    form = ScheduleForm()
+    table = get_schedule_table()
+
+    if form.validate_on_submit():  # POSTリクエストとバリデーション
+        try:
+            # まず現在のアイテムを取得
+            response = table.scan(
+                FilterExpression='schedule_id = :sid',
+                ExpressionAttributeValues={
+                    ':sid': schedule_id
+                }
+            )
+            items = response.get('Items', [])
+            
+            if items:
+                current_item = items[0]
+                # 新しいvenue_dateを作成
+                new_venue_date = f"{form.venue.data}#{form.date.data.isoformat()}"
+                
+                # 古いアイテムを削除
+                table.delete_item(
+                    Key={
+                        'venue_date': current_item['venue_date'],
+                        'schedule_id': schedule_id
+                    }
+                )
+                
+                # 新しいアイテムを作成
+                new_item = {
+                    'schedule_id': schedule_id,
+                    'date': form.date.data.isoformat(),
+                    'day_of_week': form.day_of_week.data,
+                    'venue': form.venue.data,
+                    'start_time': form.start_time.data,
+                    'end_time': form.end_time.data,
+                    'venue_date': new_venue_date,
+                    'created_at': datetime.now().isoformat()
+                }
+                
+                # 新しいアイテムを保存
+                table.put_item(Item=new_item)
+                
+                flash('スケジュールを更新しました', 'success')
+                return redirect(url_for('index'))
+            
+        except Exception as e:
+            app.logger.error(f"スケジュール更新エラー: {str(e)}")
+            flash('スケジュールの更新中にエラーが発生しました', 'error')
+
+    try:
+        # GETリクエスト時のフォーム表示用データ取得
+        response = table.scan(
+            FilterExpression='schedule_id = :sid',
+            ExpressionAttributeValues={
+                ':sid': schedule_id
+            }
+        )
+        items = response.get('Items', [])
+        
+        if items and request.method == 'GET':
+            schedule = items[0]
+            form.date.data = datetime.strptime(schedule['date'], '%Y-%m-%d').date()
+            form.day_of_week.data = schedule['day_of_week']
+            form.venue.data = schedule['venue']
+            form.start_time.data = schedule['start_time']
+            form.end_time.data = schedule['end_time']
+            
+    except ClientError as e:
+        app.logger.error(f"スケジュール取得エラー: {str(e)}")
+        flash('スケジュールの取得中にエラーが発生しました', 'error')
+        return redirect(url_for('index'))
+    
+    return render_template('edit_schedule.html', form=form, schedule_id=schedule_id)
+
+
+# @app.route("/edit_schedule/<schedule_id>", methods=['GET', 'POST'])
+# def edit_schedule(schedule_id):
+#     form = ScheduleForm()
+#     try:
+#         table = get_schedule_table()
+        
+#         # まず schedule_id で scan して venue_date を取得
+#         response = table.scan(
+#             FilterExpression='schedule_id = :sid',
+#             ExpressionAttributeValues={
+#                 ':sid': schedule_id
+#             }
+#         )
+#         items = response.get('Items', [])
+        
+#         if items:
+#             schedule = items[0]  # 最初のマッチしたアイテムを使用
+#             if request.method == 'GET':
+#                 form.date.data = datetime.strptime(schedule['date'], '%Y-%m-%d').date()
+#                 form.day_of_week.data = schedule['day_of_week']
+#                 form.venue.data = schedule['venue']
+#                 form.start_time.data = schedule['start_time']
+#                 form.end_time.data = schedule['end_time']
+#         else:
+#             flash('スケジュールが見つかりません', 'error')
+#             return redirect(url_for('index'))
+            
+#     except ClientError as e:
+#         app.logger.error(f"スケジュール取得エラー: {str(e)}")
+#         flash('スケジュールの取得中にエラーが発生しました', 'error')
+#         return redirect(url_for('index'))
+    
+#     return render_template('edit_schedule.html', form=form, schedule_id=schedule_id)
+
+@app.route("/delete_schedule/<schedule_id>", methods=['POST'])
+def delete_schedule(schedule_id):
+    try:
+        table = get_schedule_table()
+        app.logger.debug(f"Deleting schedule_id: {schedule_id}")
+
+        # スケジュールIDでスキャン
+        response = table.scan(
+            FilterExpression='schedule_id = :sid',
+            ExpressionAttributeValues={
+                ':sid': schedule_id
+            }
+        )
+        items = response.get('Items', [])
+        
+        app.logger.debug(f"Found items: {items}")
+        
+        if items:
+            schedule = items[0]
+            app.logger.debug(f"Attempting to delete: venue_date={schedule['venue_date']}, schedule_id={schedule_id}")
+            
+            # 両方のキーを指定して削除
+            delete_response = table.delete_item(
+                Key={
+                    'venue_date': schedule['venue_date'],
+                    'schedule_id': schedule_id
+                }
+            )
+            app.logger.debug(f"Delete response: {delete_response}")
+            
+            flash('スケジュールを削除しました', 'success')
+        else:
+            app.logger.error(f"Schedule not found: {schedule_id}")
+            flash('スケジュールが見つかりません', 'error')
+            
+    except Exception as e:
+        app.logger.error(f"スケジュール削除エラー: {str(e)}")
+        app.logger.error(f"Error details: {e}")
+        flash('スケジュールの削除中にエラーが発生しました', 'error')
+        
+    return redirect(url_for('index'))
+
+
 
 @app.route("/user_maintenance", methods=["GET", "POST"])
 # @login_required
@@ -789,7 +924,60 @@ def account(user_id):
     except ClientError as e:
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('データベースエラーが発生しました。', 'error')
-        return redirect(url_for('user_maintenance'))                              
+        return redirect(url_for('user_maintenance'))   
+
+@app.route("/table_info")
+def get_table_info():
+    try:
+        table = get_schedule_table()
+        # テーブルの詳細情報を取得
+        response = {
+            'table_name': table.name,
+            'key_schema': table.key_schema,
+            'attribute_definitions': table.attribute_definitions,
+            # サンプルデータも取得
+            'sample_data': table.scan(Limit=1)['Items']
+        }
+        return str(response)
+    except Exception as e:
+        return f'Error: {str(e)}'
+    
+@app.route("/remove_user_id")
+def remove_user_id():
+    try:
+        table = get_schedule_table()
+        response = table.scan()
+        items = response['Items']
+        
+        success_count = 0
+        error_count = 0
+        
+        for item in items:
+            try:
+                # 両方のキーを指定
+                table.update_item(
+                    Key={
+                        'venue_date': item['venue_date'],
+                        'schedule_id': item['schedule_id']
+                    },
+                    UpdateExpression='REMOVE user_id, #s',  # status も同時に削除
+                    ExpressionAttributeNames={
+                        '#s': 'status'
+                    }
+                )
+                success_count += 1
+                print(f"Processed: {item['venue_date']} - {item['schedule_id']}")
+            except Exception as e:
+                print(f"Error with item {item['schedule_id']}: {str(e)}")
+                error_count += 1
+                continue
+        
+        return f'Processed {success_count + error_count} items. Success: {success_count}, Errors: {error_count}'
+    except Exception as e:
+        return f'Error: {str(e)}'
+
+
+                          
 
 @app.route("/<int:id>/delete")
 # @login_required
