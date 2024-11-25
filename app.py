@@ -380,7 +380,6 @@ def get_schedule_table():
 
 
 
-
 @app.route("/", methods=['GET', 'POST'])
 def index():
     form = ScheduleForm()
