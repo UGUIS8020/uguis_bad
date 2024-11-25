@@ -122,7 +122,7 @@ def load_user(user_id):
 
 
 class RegistrationForm(FlaskForm):
-    organization = SelectField('所属', choices=[('uguis', '鶯'),('other', 'その他')], default='uguis', validators=[DataRequired(message='所属を選択してください')])
+    organization = SelectField('所属', choices=[('uguis', 'おかめ'),('other', 'その他')], default='uguis', validators=[DataRequired(message='所属を選択してください')])
     display_name = StringField('表示ネーム LINE名など', validators=[DataRequired(message='表示名を入力してください'), Length(min=3, max=30, message='表示名は3文字以上30文字以下で入力してください')])
     user_name = StringField('ユーザー名', validators=[DataRequired()])
     furigana = StringField('フリガナ', validators=[DataRequired()])
@@ -156,7 +156,7 @@ class RegistrationForm(FlaskForm):
         
         
 class UpdateUserForm(FlaskForm):
-    organization = SelectField('所属', choices=[('uguis', '鶯'), ('other', 'その他')], validators=[DataRequired(message='所属を選択してください')])    
+    organization = SelectField('所属', choices=[('uguis', 'おかめ'), ('other', 'その他')], validators=[DataRequired(message='所属を選択してください')])    
     display_name = StringField('表示ネーム LINE名など', validators=[DataRequired(), Length(min=3, max=30)])    
     user_name = StringField('ユーザー名', validators=[DataRequired()])    
     furigana = StringField('フリガナ',  validators=[DataRequired()])    
