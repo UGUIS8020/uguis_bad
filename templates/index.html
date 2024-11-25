@@ -94,7 +94,38 @@
                   <li>1月20日 月曜日 19:00-21:00 A面</li>
                   <li>1月23日 木曜日 19:00-21:00 A面</li>
                   <li>2月8日 土曜日 18:00-22:00 <span class="special-venue">越谷総合体育館 第1体育室</span></li>
-                </ul>            
+                </ul> 
+                
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>日付</th>
+                            <th>曜日</th>
+                            <th>開始時間</th>
+                            <th>終了時間</th>
+                            <th>会場</th>                           
+                            
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for schedule in schedules %}
+                        <tr>
+                            <td>{{ schedule.formatted_date }}</td>
+                            <td>{{ schedule.day_of_week }}</td>
+                            <td>{{ schedule.start_time }}</td>
+                            <td>{{ schedule.end_time }}</td>
+                            <td>{{ schedule.venue }}</td>                            
+                            
+                            <td>
+                                <a href="{{ url_for('edit_schedule', schedule_id=schedule.schedule_id) }}" class="btn btn-secondary">変更</a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('edit_schedule', schedule_id=schedule.schedule_id) }}" class="btn btn-secondary">削除</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
                 
                  
                                         

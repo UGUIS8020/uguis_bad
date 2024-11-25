@@ -359,40 +359,40 @@ def get_schedule_table():
     dynamodb = boto3.resource('dynamodb', region_name=region)
     return dynamodb.Table(table_name)
 
-@app.route("/", methods=['GET', 'POST'])
-def index():
-    form = ScheduleForm()
-    if form.validate_on_submit():
-        try:
-            # スケジュールテーブルの取得
-            schedule_table = get_schedule_table()
-            if not schedule_table:
-                raise ValueError("Schedule table is not initialized")
+# @app.route("/", methods=['GET', 'POST'])
+# def index():
+#     form = ScheduleForm()
+#     if form.validate_on_submit():
+#         try:
+#             # スケジュールテーブルの取得
+#             schedule_table = get_schedule_table()
+#             if not schedule_table:
+#                 raise ValueError("Schedule table is not initialized")
 
-            schedule_data = {
-                'schedule_id': str(uuid.uuid4()),  # ユニークID
-                'date': form.date.data.isoformat(),  # 日付
-                'day_of_week': form.day_of_week.data,  # 曜日
-                'venue': form.venue.data,  # 会場
-                'start_time': form.start_time.data,  # 開始時間
-                'end_time': form.end_time.data,  # 終了時間
-                'venue_date': f"{form.venue.data}#{form.date.data.isoformat()}",  # 必須: 会場と日付を組み合わせ
-                'created_at': datetime.now().isoformat(),  # 作成日時
-                'user_id': current_user.get_id() if current_user.is_authenticated else 'anonymous',  # ユーザーID
-                'status': 'active'  # ステータス
-            }
+#             schedule_data = {
+#                 'schedule_id': str(uuid.uuid4()),  # ユニークID
+#                 'date': form.date.data.isoformat(),  # 日付
+#                 'day_of_week': form.day_of_week.data,  # 曜日
+#                 'venue': form.venue.data,  # 会場
+#                 'start_time': form.start_time.data,  # 開始時間
+#                 'end_time': form.end_time.data,  # 終了時間
+#                 'venue_date': f"{form.venue.data}#{form.date.data.isoformat()}",  # 必須: 会場と日付を組み合わせ
+#                 'created_at': datetime.now().isoformat(),  # 作成日時
+#                 'user_id': current_user.get_id() if current_user.is_authenticated else 'anonymous',  # ユーザーID
+#                 'status': 'active'  # ステータス
+#             }
 
-            # DynamoDBに保存
-            schedule_table.put_item(Item=schedule_data)
+#             # DynamoDBに保存
+#             schedule_table.put_item(Item=schedule_data)
 
-            flash('スケジュールが登録されました', 'success')
-            return redirect(url_for('index'))
+#             flash('スケジュールが登録されました', 'success')
+#             return redirect(url_for('index'))
 
-        except Exception as e:
-            app.logger.error(f"スケジュール登録エラー: {str(e)}")
-            flash('スケジュールの登録中にエラーが発生しました', 'error')
+#         except Exception as e:
+#             app.logger.error(f"スケジュール登録エラー: {str(e)}")
+#             flash('スケジュールの登録中にエラーが発生しました', 'error')
     
-    return render_template("index.html", form=form)
+#     return render_template("index.html", form=form, schedules=schedules)
 
 class ScheduleForm(FlaskForm):
     date = DateField('日付', validators=[DataRequired()])
@@ -400,10 +400,10 @@ class ScheduleForm(FlaskForm):
     
     venue = SelectField('会場', validators=[DataRequired()], choices=[
         ('', '選択してください'),
-        ('normal-a', '北越谷 A面'),
-        ('normal-b', '北越谷 B面'),
-        ('koshigaya', '越谷総合体育館 第1体育室'),
-        ('winghat', 'ウィングハット')
+        ('北越谷 A面', '北越谷 A面'),
+        ('北越谷 B面', '北越谷 B面'),
+        ('越谷総合体育館 第1体育室', '越谷総合体育館 第1体育室'),
+        ('ウィングハット', 'ウィングハット')
     ])
     
     start_time = SelectField('開始時間', validators=[DataRequired()], choices=[
@@ -419,57 +419,72 @@ class ScheduleForm(FlaskForm):
     submit = SubmitField('登録')
 
 
-# def get_schedule_table():
-#     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
-#     return dynamodb.Table('Schedule')
+def get_schedule_table():
+    dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
+    return dynamodb.Table('Schedule')
 
-# # スケジュール一覧と入力ページ
-# @app.route('/', methods=['GET', 'POST'])
-# def index():
-#     table = get_schedule_table()
 
-#     # POSTリクエストで新しいスケジュールを追加
-#     if request.method == 'POST':
-#         # フォームデータを取得
-#         date = request.form['date']
-#         day_of_week = request.form['day_of_week']
-#         venue = request.form['venue']
-#         start_time = request.form['start_time']
-#         end_time = request.form['end_time']
-#         user_id = 'anonymous'  # 本来は認証されたユーザーのIDを使用
 
-#         # データ構造を作成
-#         schedule_data = {
-#             'schedule_id': str(uuid.uuid4()),
-#             'date': date,
-#             'day_of_week': day_of_week,
-#             'venue': venue,
-#             'start_time': start_time,
-#             'end_time': end_time,
-#             'venue_date': f"{venue}#{date}",
-#             'created_at': datetime.now().isoformat(),
-#             'user_id': user_id,
-#             'status': 'active'
-#         }
 
-#         # DynamoDBに登録
-#         try:
-#             table.put_item(Item=schedule_data)
-#         except Exception as e:
-#             app.logger.error(f"スケジュール登録エラー: {str(e)}")
+@app.route("/", methods=['GET', 'POST'])
+def index():
+    form = ScheduleForm()
+    if form.validate_on_submit():
+        try:
+            schedule_table = get_schedule_table()
+            if not schedule_table:
+                raise ValueError("Schedule table is not initialized")
 
-#         # リダイレクトしてフォームをリセット
-#         return redirect(url_for('index'))
+            schedule_data = {
+                'schedule_id': str(uuid.uuid4()),
+                'date': form.date.data.isoformat(),
+                'day_of_week': form.day_of_week.data,
+                'venue': form.venue.data,
+                'start_time': form.start_time.data,        # そのまま HH:MM 形式で保存
+                'end_time': form.end_time.data,           # そのまま HH:MM 形式で保存
+                'venue_date': f"{form.venue.data}#{form.date.data.isoformat()}",
+                'created_at': datetime.now().isoformat(),
+                'user_id': current_user.get_id() if current_user.is_authenticated else 'anonymous',
+                'status': 'active'
+            }
 
-#     # GETリクエストでスケジュール一覧を表示
-#     schedules = []
-#     try:
-#         response = table.scan()
-#         schedules = response.get('Items', [])
-#     except Exception as e:
-#         app.logger.error(f"スケジュール取得エラー: {str(e)}")
+            schedule_table.put_item(Item=schedule_data)
+            flash('スケジュールが登録されました', 'success')
+            return redirect(url_for('index'))
 
-#     return render_template('index.html', schedules=schedules)
+        except Exception as e:
+            app.logger.error(f"スケジュール登録エラー: {str(e)}")
+            flash('スケジュールの登録中にエラーが発生しました', 'error')
+
+    # スケジュール一覧の取得とソート
+    try:
+        schedules = get_schedules_with_formatting()
+        schedules = sorted(schedules, key=lambda x: (x['date'], x['start_time']))
+    except Exception as e:
+        app.logger.error(f"スケジュール取得エラー: {str(e)}")
+        schedules = []
+
+    return render_template("index.html", form=form, schedules=schedules)
+
+
+def get_schedules_with_formatting():
+    """
+    スケジュール一覧を取得し、日付をフォーマットして返す
+    """
+    schedule_table = get_schedule_table()
+    if not schedule_table:
+        raise ValueError("Schedule table is not initialized")
+
+    # DynamoDBからスケジュールを取得し、日付をフォーマット
+    response = schedule_table.scan()
+    schedules = []
+    for schedule in response.get('Items', []):
+        schedule['formatted_date'] = datetime.strptime(
+            schedule['date'], "%Y-%m-%d"
+        ).strftime("%Y %m月%d日")
+        schedules.append(schedule)
+
+    return schedules
 
 @app.route('/edit_schedule/<string:schedule_id>', methods=['GET', 'POST'])
 def edit_schedule(schedule_id):
