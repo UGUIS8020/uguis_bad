@@ -57,7 +57,10 @@
               <body>
               <div class="schedule">
                 <h1>練習予定</h1>                
-                
+                1{{ current_user.is_authenticated }}1<br>
+                2{{ current_user.is_admin }}2<br>
+                3{{ current_user.__dict__ }}3<br>
+                4{{ current_user.administrator }}4<br>
                 
                 <table class="table table-striped">
                     <thead>
@@ -78,6 +81,8 @@
                             <td>{{ schedule.start_time }}</td>
                             <td>{{ schedule.end_time }}</td>
                             <td>{{ schedule.venue }}</td>  
+
+                            
                             
                             {% if current_user.is_authenticated and current_user.is_admin %}
                             
