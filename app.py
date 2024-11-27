@@ -38,17 +38,24 @@ def create_app():
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")                 
         print(f"Secret key: {app.config['SECRET_KEY']}")
         
-        # AWS S3の設定
-        app.config['S3_BUCKET'] = os.getenv("S3_BUCKET")
-        aws_region = os.getenv("AWS_REGION", "ap-northeast-1")
-        app.config['S3_LOCATION'] = f"https://{app.config['S3_BUCKET']}.s3.{aws_region}.amazonaws.com/"
+        # # AWS S3の設定
+        # app.config['S3_BUCKET'] = os.getenv("S3_BUCKET")
+        # aws_region = os.getenv("AWS_REGION", "ap-northeast-1")
+        # app.config['S3_LOCATION'] = f"https://{app.config['S3_BUCKET']}.s3.{aws_region}.amazonaws.com/"
         
-        
+
         aws_credentials = {
             'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
             'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
             'region_name': os.getenv("AWS_REGION")
-        }       
+        }
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=aws_credentials['aws_access_key_id'],
+            aws_secret_access_key=aws_credentials['aws_secret_access_key'],
+            region_name=aws_credentials['region_name']
+        )       
+              
         
         # 必須環境変数のチェック
         required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET"]
@@ -986,6 +993,69 @@ def remove_user_id():
         return f'Processed {success_count + error_count} items. Success: {success_count}, Errors: {error_count}'
     except Exception as e:
         return f'Error: {str(e)}'
+    
+
+@app.route('/gallery')
+def gallery():
+    return render_template('gallery.html')
+    
+@app.route("/create", methods=["GET", "POST"])
+def create():
+    if request.method == "POST":
+        title = request.form.get("title")
+        body = request.form.get("body")
+        image = request.files.get("image")
+        
+
+        
+        if image and image.filename != '': 
+            original_filename = secure_filename(image.filename)
+            # ファイル名にユニークなIDを追加して変更
+            unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+
+
+            # 画像を読み込む
+            img = Image.open(image)
+            max_width = 1500  # 最大横幅を1500pxに設定
+
+            # 画像の横幅が1500pxを超えている場合に縮小
+            if img.width > max_width:
+                # アスペクト比を維持したままリサイズ
+                new_height = int((max_width / img.width) * img.height)                
+                img = img.resize((max_width, new_height), Image.LANCZOS)
+
+            # リサイズされた画像をバイトIOオブジェクトに保存
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='JPEG')
+            img_byte_arr.seek(0)
+
+             # リサイズされた画像をS3にアップロード
+            s3.upload_fileobj(
+                img_byte_arr,
+                app.config['S3_BUCKET'],
+                unique_filename
+            )
+            image_url = f"{app.config['S3_LOCATION']}{unique_filename}"
+        else:
+            image_url = None
+
+         # デバッグ用に結果を出力
+        print(f"Title: {title}")
+        print(f"Body: {body}")
+        print(f"Image URL: {image_url}")
+
+        # new_post = Post(title=title, body=body, image_url=image_url, category_id=category_id)
+        # db.session.add(new_post)
+        # db.session.commit()
+
+        # 投稿完了後トップページにリダイレクト
+        return redirect(url_for('index'))
+    
+
+
+
+    # GET メソッドでフォームを表示
+    return render_template("create.html")
 
 
                           
