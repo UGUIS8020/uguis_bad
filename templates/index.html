@@ -1,70 +1,45 @@
 {% extends "base.html" %}
 {% block content %}      
-<section id="about" class="mt-5 mb-5 text-center">
+<section id="about" class="mt-3 mb-3 text-center">
     <h2 class="mb-3">バドミントンメンバー募集</h2>
     <p class="lead">初級者～上級者どなたでも参加できます<br>
         レベルが違っても楽しくゲームできる方<br>
     未経験者はご相談ください。<br>
                 </p>
     
-    <div class="row">
-        <div>
-            <h3>参加費</h3>
-            <p>初回1000円、2回目以降 600円</p>
-        </div>
-        <h3>練習場所</h3>
-        <div>            
-            <p><b>北越谷体育館 越谷市立地域スポーツセンター</b><br>
-            〒343-0025 埼玉県越谷市大沢二丁目10番21号<br>
-            北越谷駅東口 徒歩7分</p>
-        </div>
-        <div>            
-            <p><b>越谷市立総合体育館</b><br>
-            〒343-0011埼玉県越谷市増林ニ丁目33番地<br></p>
-        </div>
-    </div>
+                <div class="row justify-content-center">  <!-- justify-content-center を追加 -->
+                    <div class="col-12 col-md-8 text-center">  <!-- col-md-8 と text-center を追加 -->
+                        <div>
+                            <h3>参加費</h3>
+                            <p>初回1000円、2回目以降 600円</p>
+                        </div>
+                        <h3>練習場所</h3>
+                        <div class="mb-3">            
+                            <p><b>北越谷体育館 越谷市立地域スポーツセンター</b><br>
+                            〒343-0025 埼玉県越谷市大沢二丁目10番21号<br>
+                            北越谷駅東口 徒歩7分</p>
+                        </div>
+                        <div>            
+                            <p><b>越谷市立総合体育館</b><br>
+                            〒343-0011埼玉県越谷市増林ニ丁目33番地<br></p>
+                        </div>
+                    </div>
+                </div>
 </section>
+
     <div class="container">       
-        <section id="schedule" class="mb-5">
-            <style>
-                .schedule {
-                  font-family: sans-serif;
-                  max-width: 800px;
-                  margin: 0 auto;
-                }
-                .schedule h1 {
-                  color: #333;
-                  margin-bottom: 10px;
-                }
-                .schedule h2 {
-                  color: #444;
-                  margin: 25px 0 15px;
-                  padding-bottom: 5px;
-                  border-bottom: 2px solid #eee;
-                }
-                .schedule th {
-                  background-color: #8ea604;
-                  
-                }
-                .schedule td {
-                  padding: 10px;
-                  margin: 5px 0;                  
-                  background-color: #ebe8e6;
-                  
-                }
-                .special-venue {
-                  color: #2c5282;
-                  font-weight: bold;
-                }
-              </style>
+        <section id="schedule" class="mb-5">         
+
               </head>
               <body>
-              <div class="schedule">
+              <div class="schedule text-center">
                 <h1>練習予定</h1>                
                 テストcode:1{{ current_user.is_authenticated }}1:2{{ current_user.is_admin }}2
                 3{{ current_user.__dict__ }}3:4{{ current_user.administrator }}4<br>
                 
-                <table class="table table-striped">
+                <table class="table table-striped">              
+                      
+
                     <thead>
                         <tr>
                             <th>日付</th>
@@ -95,12 +70,7 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-                
-                 
-                                        
-          
-            
+                </table>  
 
              
                 {% if current_user.is_authenticated and current_user.is_admin %}
@@ -232,17 +202,12 @@
 
               {% endif %}
 
-             
-
-              
-                  
 
       </section>
-      <section id="contact" class="mb-5">
+      <section id="contact" class="mb-5 text-center">
         <h2 class="mb-3">連絡先</h2>
-        <div class="d-flex flex-column gap-3 mb-4" >
-            <a href="https://line.me/ti/p/gErDAMJEId" target="_blank" rel="noopener noreferrer" class="btn" style="background-color: #00B900; color: white; font-size: 1.5rem;"><b>LINEで連絡 ココをクリック</b></a>
-            <!-- <img src="images/line.jpg" alt="LINEのQRコード" width="200" height="200" class="img-fluid" loading="lazy"> -->
+        <div class="d-flex flex-column align-items-center gap-3 mb-4" >
+            <a href="https://line.me/ti/p/gErDAMJEId" target="_blank" rel="noopener noreferrer" class="btn" style="background-color: #00B900; color: white; font-size: 1.5rem; width: 700px; max-width: 100%;"><b>LINEで連絡 ココをクリック</b></a>
         </div>
 
         <section class="mb-2 text-center">
@@ -258,7 +223,7 @@
       </section> 
         
         <!-- 中央寄せでレスポンシブ対応 -->
-        <div class="text-center">
+        <div class="text-center mb-3">
             <img src="/static/images/top.jpg" 
                  alt="画像の説明" 
                  class="img-fluid"
