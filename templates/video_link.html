@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}videos{% endblock %}
+{% block content %}
+<header class="bg-light py-3">
+    <div class="container text-center">
+        <h1>鶯 Boot Camp10</h1>
+        <h2>バドミントンの練習動画リンク</h2>
+        <h3>初心者、初級者は上から順番に練習すれば3か月で中級者と楽しくゲームができるようになるリンク集を作りました。</h3>
+    </div>
+</header>
+
+<main class="container mt-5">
+    <section class="video-section">
+        <h2>一人でできる練習</h2>
+        <ul>
+            <li><a href="https://www.youtube.com/watch?v=6OAD8slheYE&t=248s" target="_blank" rel="noopener noreferrer">1</a></li>
+            <li><a href="https://www.youtube.com/watch?v=QJx8jHvzqFQ" target="_blank" rel="noopener noreferrer">2</a></li>
+        </ul>
+    </section>
+
+    <section class="video-section">
+        <h2>シャトル投げ</h2>
+        <ul>
+            <li><a href="https://www.youtube.com/watch?v=aeYVkD_dc4w" target="_blank" rel="noopener noreferrer">1</a></li>
+            <li><a href="https://www.youtube.com/watch?v=KOqDmhwWJG0" target="_blank" rel="noopener noreferrer">2</a></li>
+            <li><a href="https://www.youtube.com/watch?v=bRXk3-RoUc4&t=69s" target="_blank" rel="noopener noreferrer">3</a></li>
+        </ul>
+    </section>
+
+    <!-- 他のセクションも同様に続く -->
+
+    <section class="video-section">
+        <h2>お勧めチャンネル</h2>
+        <ul>
+            <li><a href="https://www.youtube.com/@kalidia_badminton_channel" target="_blank" rel="noopener noreferrer">KALIDIAバドミントンチャンネル</a></li>
+            <li><a href="https://www.youtube.com/@MizukiFujiiBadmintonChannel" target="_blank" rel="noopener noreferrer">Mizuki Fujii Badminton Channel</a></li>
+        </ul>
+    </section>
+
+    <a href="{{ url_for('index') }}" class="btn btn-primary btn-home">ホームに戻る</a>
+</main>
+{% endblock %}
