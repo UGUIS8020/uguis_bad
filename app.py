@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 import uuid
 from datetime import datetime, date
 import io
-from PIL import Image
+from PIL import Image, ExifTags
 from dateutil.relativedelta import relativedelta
 from botocore.exceptions import ClientError
 from init_db import init_tables  # init_counter_tableから変更
@@ -22,77 +22,135 @@ import random
 from urllib.parse import urlparse, urljoin
 from dotenv import load_dotenv
 
-# ロギングの設定
+# # ロギングの設定
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+
+# # グローバル変数の定義
+# app = Flask(__name__)
+# login_manager = LoginManager()
+
+# def create_app():
+#     """アプリケーションの初期化と設定"""
+#     try:        
+#         load_dotenv()
+        
+#         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")                 
+#         print(f"Secret key: {app.config['SECRET_KEY']}")        
+
+#         aws_credentials = {
+#             'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
+#             'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
+#             'region_name': os.getenv("AWS_REGION")
+#         }        
+              
+        
+#         # 必須環境変数のチェック
+#         required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET"]
+#         missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+#         if missing_vars:
+#             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+#         # AWSクライアントの初期化
+#         app.s3 = boto3.client('s3', **aws_credentials)
+#         app.dynamodb = boto3.client('dynamodb', **aws_credentials)
+#         app.dynamodb_resource = boto3.resource('dynamodb', **aws_credentials)
+        
+#         # テーブル名の設定
+#         app.table_name = os.getenv("TABLE_NAME")
+#         app.table_name_schedule = os.getenv("TABLE_NAME_SCHEDULE")
+
+#         # DynamoDBリソースからテーブルを取得
+#         app.table = app.dynamodb_resource.Table(app.table_name)  # "bad-users"
+#         app.table_schedule = app.dynamodb_resource.Table(app.table_name_schedule)  # "Schedule"
+
+#         # Flask-Loginの設定
+#         login_manager.init_app(app)
+#         login_manager.session_protection = "strong"
+#         login_manager.login_view = 'login'
+#         login_manager.login_message = 'このページにアクセスするにはログインが必要です。'        
+        
+#         # DynamoDBテーブルの初期化
+#         init_tables()
+#         logger.info("Application initialized successfully")
+        
+#         return app
+        
+#     except Exception as e:
+#         logger.error(f"Failed to initialize application: {str(e)}")
+#         raise
+
+# app = create_app()  # アプリケーションの初期化
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# グローバル変数の定義
-app = Flask(__name__)
+# Flask-Login用
 login_manager = LoginManager()
 
 def create_app():
+
     """アプリケーションの初期化と設定"""
     try:        
         load_dotenv()
         
-        app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")                 
+        # Flaskアプリケーションの作成
+        app = Flask(__name__)        
+        
+        # Secret Keyの設定
+        app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(24))
         print(f"Secret key: {app.config['SECRET_KEY']}")
-        
-        # # AWS S3の設定
-        # app.config['S3_BUCKET'] = os.getenv("S3_BUCKET")
-        # aws_region = os.getenv("AWS_REGION", "ap-northeast-1")
-        # app.config['S3_LOCATION'] = f"https://{app.config['S3_BUCKET']}.s3.{aws_region}.amazonaws.com/"
-        
 
+        # AWS認証情報の設定
         aws_credentials = {
             'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
             'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
-            'region_name': os.getenv("AWS_REGION")
+            'region_name': os.getenv("AWS_REGION", "us-east-1")
         }
-        s3 = boto3.client(
-            's3',
-            aws_access_key_id=aws_credentials['aws_access_key_id'],
-            aws_secret_access_key=aws_credentials['aws_secret_access_key'],
-            region_name=aws_credentials['region_name']
-        )       
-              
-        
+
         # 必須環境変数のチェック
-        required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET"]
+        required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET", "TABLE_NAME", "TABLE_NAME_SCHEDULE"]
         missing_vars = [var for var in required_env_vars if not os.getenv(var)]
         if missing_vars:
             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+         # 必須環境変数をFlaskの設定に追加
+        app.config["S3_BUCKET"] = os.getenv("S3_BUCKET", "default-bucket-name")
+        app.config["AWS_REGION"] = os.getenv("AWS_REGION")
+        app.config['S3_LOCATION'] = f"https://{app.config['S3_BUCKET']}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/"
+        print(f"S3_BUCKET: {app.config['S3_BUCKET']}")  # デバッグ用
 
         # AWSクライアントの初期化
         app.s3 = boto3.client('s3', **aws_credentials)
         app.dynamodb = boto3.client('dynamodb', **aws_credentials)
         app.dynamodb_resource = boto3.resource('dynamodb', **aws_credentials)
-        
-        # テーブル名の設定
+
+        # DynamoDBテーブルの設定
         app.table_name = os.getenv("TABLE_NAME")
         app.table_name_schedule = os.getenv("TABLE_NAME_SCHEDULE")
-
-        # DynamoDBリソースからテーブルを取得
-        app.table = app.dynamodb_resource.Table(app.table_name)  # "bad-users"
-        app.table_schedule = app.dynamodb_resource.Table(app.table_name_schedule)  # "Schedule"
+        app.table = app.dynamodb_resource.Table(app.table_name)
+        app.table_schedule = app.dynamodb_resource.Table(app.table_name_schedule)
 
         # Flask-Loginの設定
         login_manager.init_app(app)
         login_manager.session_protection = "strong"
         login_manager.login_view = 'login'
-        login_manager.login_message = 'このページにアクセスするにはログインが必要です。'        
-        
-        # DynamoDBテーブルの初期化
-        init_tables()
+        login_manager.login_message = 'このページにアクセスするにはログインが必要です。'
+
+        # DynamoDBテーブルの初期化（init_tablesの実装が必要）
+        # init_tables()
+
         logger.info("Application initialized successfully")
-        
         return app
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize application: {str(e)}")
         raise
 
-app = create_app()  # アプリケーションの初期化
+# アプリケーションの初期化
+app = create_app()
+
 
 def tokyo_time():
     return datetime.now(pytz.timezone('Asia/Tokyo'))
@@ -993,32 +1051,88 @@ def remove_user_id():
         return f'Processed {success_count + error_count} items. Success: {success_count}, Errors: {error_count}'
     except Exception as e:
         return f'Error: {str(e)}'
-    
 
-@app.route('/gallery')
+
+# @app.route("/gallery", methods=["GET", "POST"])
+# def gallery():
+#     posts = []
+
+#     if request.method == "POST":
+#         image = request.files.get("image")
+#         if image and image.filename != '':
+#             original_filename = secure_filename(image.filename)
+#             unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+
+#             img = Image.open(image)
+#             max_width = 1500
+
+#             # 画像の横幅が1500pxを超えている場合に縮小
+#             if img.width > max_width:
+#                 # アスペクト比を維持したままリサイズ
+#                 new_height = int((max_width / img.width) * img.height)                
+#                 img = img.resize((max_width, new_height), Image.LANCZOS)
+
+#             # リサイズされた画像をバイトIOオブジェクトに保存
+#             img_byte_arr = io.BytesIO()
+#             img.save(img_byte_arr, format='JPEG')
+#             img_byte_arr.seek(0)
+
+#             # appを直接参照
+#             app.s3.upload_fileobj(
+#                 img_byte_arr,
+#                 app.config["S3_BUCKET"],
+#                 unique_filename
+#             )
+#             image_url = f"{app.config['S3_LOCATION']}{unique_filename}"
+
+#             print(f"Uploaded Image URL: {image_url}")
+#             return redirect(url_for("gallery"))  # POST後はGETリクエストにリダイレクト
+
+#     # GETリクエスト: S3バケット内の画像を取得
+#     try:
+#         response = app.s3.list_objects_v2(Bucket=app.config["S3_BUCKET"])
+#         if "Contents" in response:
+#             for obj in response["Contents"]:
+#                 print(f"Found object key: {obj['Key']}")  # 取得したキーをデバッグ出力
+#                 posts.append({
+#                     "image_url": f"{app.config['S3_LOCATION']}{obj['Key']}"
+#                 })
+#     except Exception as e:
+#         print(f"Error fetching images from S3: {e}")
+
+#     return render_template("gallery.html", posts=posts)
+
+
+@app.route("/gallery", methods=["GET", "POST"])
 def gallery():
-    return render_template('gallery.html')
-    
-@app.route("/create", methods=["GET", "POST"])
-def create():
-    if request.method == "POST":
-        title = request.form.get("title")
-        body = request.form.get("body")
-        image = request.files.get("image")
-        
+    posts = []
 
-        
-        if image and image.filename != '': 
+    if request.method == "POST":
+        image = request.files.get("image")
+        if image and image.filename != '':
             original_filename = secure_filename(image.filename)
-            # ファイル名にユニークなIDを追加して変更
             unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
 
-
-            # 画像を読み込む
             img = Image.open(image)
-            max_width = 1500  # 最大横幅を1500pxに設定
 
-            # 画像の横幅が1500pxを超えている場合に縮小
+            try:
+                exif = img._getexif()
+                if exif is not None:
+                    for orientation in ExifTags.TAGS.keys():
+                        if ExifTags.TAGS[orientation] == "Orientation":
+                            break
+                    orientation_value = exif.get(orientation)
+                    if orientation_value == 3:
+                        img = img.rotate(180, expand=True)
+                    elif orientation_value == 6:
+                        img = img.rotate(270, expand=True)
+                    elif orientation_value == 8:
+                        img = img.rotate(90, expand=True)
+            except (AttributeError, KeyError, IndexError):
+                # EXIFが存在しない場合はそのまま続行
+                pass
+
+            max_width = 500           
             if img.width > max_width:
                 # アスペクト比を維持したままリサイズ
                 new_height = int((max_width / img.width) * img.height)                
@@ -1029,36 +1143,47 @@ def create():
             img.save(img_byte_arr, format='JPEG')
             img_byte_arr.seek(0)
 
-             # リサイズされた画像をS3にアップロード
-            s3.upload_fileobj(
+            # appを直接参照
+            app.s3.upload_fileobj(
                 img_byte_arr,
-                app.config['S3_BUCKET'],
+                app.config["S3_BUCKET"],
                 unique_filename
             )
             image_url = f"{app.config['S3_LOCATION']}{unique_filename}"
-        else:
-            image_url = None
 
-         # デバッグ用に結果を出力
-        print(f"Title: {title}")
-        print(f"Body: {body}")
-        print(f"Image URL: {image_url}")
+            print(f"Uploaded Image URL: {image_url}")
+            return redirect(url_for("gallery"))  # POST後はGETリクエストにリダイレクト
 
-        # new_post = Post(title=title, body=body, image_url=image_url, category_id=category_id)
-        # db.session.add(new_post)
-        # db.session.commit()
+    # GETリクエスト: S3バケット内の画像を取得
+    try:
+        response = app.s3.list_objects_v2(Bucket=app.config["S3_BUCKET"])
+        if "Contents" in response:
+            for obj in response["Contents"]:
+                print(f"Found object key: {obj['Key']}")  # 取得したキーをデバッグ出力
+                posts.append({
+                    "image_url": f"{app.config['S3_LOCATION']}{obj['Key']}"
+                })
+    except Exception as e:
+        print(f"Error fetching images from S3: {e}")
 
-        # 投稿完了後トップページにリダイレクト
-        return redirect(url_for('index'))
+    return render_template("gallery.html", posts=posts)
+
+
+@app.route("/delete_image/<filename>", methods=["POST"])
+@login_required
+def delete_image(filename):
+    try:
+        # S3から指定されたファイルを削除
+        app.s3.delete_object(Bucket=app.config["S3_BUCKET"], Key=filename)
+        print(f"Deleted {filename} from S3")
+
+        # 削除成功後にアップロードページにリダイレクト
+        return redirect(url_for("gallery"))
+
+    except Exception as e:
+        print(f"Error deleting {filename}: {e}")
+        return "Error deleting the image", 500
     
-
-
-
-    # GET メソッドでフォームを表示
-    return render_template("create.html")
-
-
-                          
 
 @app.route("/<int:id>/delete")
 # @login_required
