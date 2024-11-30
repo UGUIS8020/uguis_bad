@@ -152,7 +152,7 @@
                           const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
                           const date = new Date(dateInput.value);
                           const dayOfWeek = weekDays[date.getDay()];
-                          dayOfWeekInput.value = `${dayOfWeek}曜日`;
+                          dayOfWeekInput.value = dayOfWeek;
               
                           // 曜日に応じて背景色を変更（土日の場合）
                           if (date.getDay() === 0) { // 日曜日

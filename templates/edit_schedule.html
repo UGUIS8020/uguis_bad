@@ -23,7 +23,7 @@
         </div>
         <div class="mb-3">
             <label for="end_time">終了時間</label>
-            <select name="end_time" class="form-control" id="end_time">
+            <select name="end_time" class="form-control" id="end_time" data-current-value="{{ schedule.end_time }}">
                 <!-- JavaScriptで動的にオプションを生成 -->
             </select>
         </div>
@@ -44,17 +44,27 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // 日付関連の要素
         const dateField = document.querySelector('input[name="date"]');
         const dayOfWeekField = document.querySelector('input[name="day_of_week"]');
         
-        console.log('Date field found:', dateField);
-        console.log('Day of week field found:', dayOfWeekField);
+        // 時間関連の要素
+        const startTimeSelect = document.getElementById('start_time');
+        const endTimeSelect = document.getElementById('end_time');
+        
+        console.log('Fields found:', {
+            dateField,
+            dayOfWeekField,
+            startTimeSelect,
+            endTimeSelect
+        });
     
+        // 曜日の更新関数
         function updateDayOfWeek() {
             try {
                 if (dateField.value) {
                     const date = new Date(dateField.value);
-                    const days = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+                    const days = ['日', '月', '火', '水', '木', '金', '土'];
                     const dayOfWeek = days[date.getDay()];
                     dayOfWeekField.value = dayOfWeek;
                 }
@@ -62,47 +72,46 @@
                 console.error('Error updating day of week:', error);
             }
         }
-    
-        // 初期値の設定
-        updateDayOfWeek();
-    
-        // 日付変更時の処理
-        dateField.addEventListener('change', function() {
-            updateDayOfWeek();
-        });
-    });
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const startTimeField = document.querySelector('input[name="start_time"]');
-        const endTimeField = document.querySelector('input[name="end_time"]');
+         // 現在の終了時間の値を保持
+        const currentEndTime = endTimeSelect.getAttribute('data-current-value');
     
+        // 終了時間の更新関数
         function updateEndTimeOptions() {
-            if (startTimeField.value) {
-                const startTime = startTimeField.value.split(':');
-                const startHour = parseInt(startTime[0]);
-                const startMinute = parseInt(startTime[1]);
-    
-                // 終了時間の選択肢を制限
-                let endTimeOptions = '';
-                for (let hour = startHour; hour < 24; hour++) {
-                    for (let minute = startMinute; minute < 60; minute += 15) { // 15分刻み
-                        const optionValue = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                        endTimeOptions += `<option value="${optionValue}">${optionValue}</option>`;
+            if (startTimeSelect && startTimeSelect.value) {
+                const selectedHour = parseInt(startTimeSelect.value.split(':')[0]);
+                
+                endTimeSelect.innerHTML = '<option value="">選択してください</option>';
+                for (let i = selectedHour + 1; i <= 23; i++) {
+                    const timeStr = `${i.toString().padStart(2, '0')}:00`;
+                    const option = new Option(timeStr, timeStr);
+                    if (timeStr === currentEndTime) {  // ここが重要: 現在の値と一致するかチェック
+                        option.selected = true;         // 一致する場合は選択状態にする
                     }
-                    startMinute = 0; // 次の時間は 0分から
+                    endTimeSelect.add(option);
                 }
-                endTimeField.innerHTML = endTimeOptions;
             }
         }
     
-        // 初期値の制限を更新
-        updateEndTimeOptions();
-    
-        // 開始時間変更時の終了時間更新
-        startTimeField.addEventListener('change', function() {
+        // 初期値の設定
+        if (dateField && dayOfWeekField) {
+            updateDayOfWeek();
+        }
+        
+        if (startTimeSelect && endTimeSelect) {
             updateEndTimeOptions();
-        });
+        }
+    
+        // イベントリスナーの設定
+        if (dateField) {
+            dateField.addEventListener('change', updateDayOfWeek);
+        }
+        
+        if (startTimeSelect) {
+            startTimeSelect.addEventListener('change', updateEndTimeOptions);
+        }
     });
+    
     </script>
 
 {% endblock %}

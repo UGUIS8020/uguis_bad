@@ -504,6 +504,7 @@ class ScheduleForm(FlaskForm):
         ('北越谷 A面', '北越谷 A面'),
         ('北越谷 B面', '北越谷 B面'),
         ('越谷総合体育館 第1体育室', '越谷総合体育館 第1体育室'),
+        ('越谷総合体育館 第1体育室 6面', '越谷総合体育館 第1体育室 6面'),
         ('ウィングハット', 'ウィングハット')
     ])
     
@@ -859,7 +860,7 @@ def edit_schedule(schedule_id):
         flash('スケジュールの取得中にエラーが発生しました', 'error')
         return redirect(url_for('index'))
     
-    return render_template('edit_schedule.html', form=form, schedule_id=schedule_id)
+    return render_template('edit_schedule.html', form=form, schedule=schedule, schedule_id=schedule_id)
 
 
 @app.route("/delete_schedule/<schedule_id>", methods=['POST'])
