@@ -22,67 +22,6 @@ import random
 from urllib.parse import urlparse, urljoin
 from dotenv import load_dotenv
 
-# # ロギングの設定
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-
-# # グローバル変数の定義
-# app = Flask(__name__)
-# login_manager = LoginManager()
-
-# def create_app():
-#     """アプリケーションの初期化と設定"""
-#     try:        
-#         load_dotenv()
-        
-#         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")                 
-#         print(f"Secret key: {app.config['SECRET_KEY']}")        
-
-#         aws_credentials = {
-#             'aws_access_key_id': os.getenv("AWS_ACCESS_KEY_ID"),
-#             'aws_secret_access_key': os.getenv("AWS_SECRET_ACCESS_KEY"),
-#             'region_name': os.getenv("AWS_REGION")
-#         }        
-              
-        
-#         # 必須環境変数のチェック
-#         required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET"]
-#         missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-#         if missing_vars:
-#             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
-
-#         # AWSクライアントの初期化
-#         app.s3 = boto3.client('s3', **aws_credentials)
-#         app.dynamodb = boto3.client('dynamodb', **aws_credentials)
-#         app.dynamodb_resource = boto3.resource('dynamodb', **aws_credentials)
-        
-#         # テーブル名の設定
-#         app.table_name = os.getenv("TABLE_NAME")
-#         app.table_name_schedule = os.getenv("TABLE_NAME_SCHEDULE")
-
-#         # DynamoDBリソースからテーブルを取得
-#         app.table = app.dynamodb_resource.Table(app.table_name)  # "bad-users"
-#         app.table_schedule = app.dynamodb_resource.Table(app.table_name_schedule)  # "Schedule"
-
-#         # Flask-Loginの設定
-#         login_manager.init_app(app)
-#         login_manager.session_protection = "strong"
-#         login_manager.login_view = 'login'
-#         login_manager.login_message = 'このページにアクセスするにはログインが必要です。'        
-        
-#         # DynamoDBテーブルの初期化
-#         init_tables()
-#         logger.info("Application initialized successfully")
-        
-#         return app
-        
-#     except Exception as e:
-#         logger.error(f"Failed to initialize application: {str(e)}")
-#         raise
-
-# app = create_app()  # アプリケーションの初期化
-
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -200,7 +139,16 @@ class RegistrationForm(FlaskForm):
     pass_confirm = PasswordField('パスワード(確認)', validators=[DataRequired()])    
     gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])
     date_of_birth = DateField('生年月日', format='%Y-%m-%d', validators=[DataRequired()])
+    guardian_name = StringField('保護者氏名')
+    emergency_phone = StringField('緊急連絡先電話番号', validators=[DataRequired(), Length(min=10, max=15, message='正しい電話番号を入力してください')])
     submit = SubmitField('登録')
+
+    def validate_guardian_name(self, field):
+        if self.date_of_birth.data:
+            today = date.today()
+            age = today.year - self.date_of_birth.data.year - ((today.month, today.day) < (self.date_of_birth.data.month, self.date_of_birth.data.day))
+            if age < 18 and not field.data:
+                raise ValidationError('18歳未満の方は保護者氏名の入力が必要です')
 
     def validate_email(self, field):
         try:
@@ -234,6 +182,8 @@ class UpdateUserForm(FlaskForm):
     pass_confirm = PasswordField('パスワード(確認)')    
     gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])    
     date_of_birth = DateField('生年月日', format='%Y-%m-%d', validators=[DataRequired()])    
+    guardian_name = StringField('保護者氏名')
+    emergency_phone = StringField('緊急連絡先電話番号', validators=[DataRequired(), Length(min=10, max=15, message='正しい電話番号を入力してください')])
     submit = SubmitField('更新')
 
     def __init__(self, user_id, dynamodb_table, *args, **kwargs):
@@ -260,93 +210,7 @@ class UpdateUserForm(FlaskForm):
                         
         except ClientError as e:
             raise ValidationError('メールアドレスの確認中にエラーが発生しました。')
-
-
-# class User(UserMixin):
-#     def __init__(self, user_id, display_name, user_name, furigana, email, password_hash, 
-#                  gender, date_of_birth, post_code, address, phone, 
-#                  organization='uguis', administrator=False, 
-#                  created_at=None, updated_at=None):
-#         super().__init__()
-#         self.user_id = user_id
-#         self.display_name = display_name
-#         self.user_name = user_name
-#         self.furigana = furigana
-#         self.email = email
-#         self.password_hash = password_hash  # ハッシュ化されたパスワードを保持
-#         self.gender = gender
-#         self.date_of_birth = date_of_birth
-#         self.post_code = post_code
-#         self.address = address
-#         self.phone = phone
-#         self.organization = organization
-#         self.administrator = administrator
-#         self.created_at = created_at or datetime.now().isoformat()
-#         self.updated_at = updated_at or datetime.now().isoformat()    
-
-#     def get_id(self):
-#         return str(self.user_id)  # Flask-Loginは文字列のIDを期待します
-
-#     @staticmethod
-#     def from_dynamodb_item(item):
-#         return User(
-#             user_id=item.get('user_id', {}).get('S'),
-#             display_name=item.get('display_name', {}).get('S'),
-#             user_name=item.get('user_name', {}).get('S'),
-#             furigana=item.get('furigana', {}).get('S'),
-#             email=item.get('email', {}).get('S'),
-#             password_hash=item.get('password', {}).get('S'),  # パスワードハッシュを直接受け取る
-#             gender=item.get('gender', {}).get('S'),
-#             date_of_birth=item.get('date_of_birth', {}).get('S'),
-#             post_code=item.get('post_code', {}).get('S'),
-#             address=item.get('address', {}).get('S'),
-#             phone=item.get('phone', {}).get('S'),
-#             organization=item.get('organization', {}).get('S', 'uguis'),
-#             administrator=bool(item.get('administrator', {}).get('BOOL', False)),  # ブール型に変換
-#             created_at=item.get('created_at', {}).get('S'),
-#             updated_at=item.get('updated_at', {}).get('S')
-#         )
-
-#     def to_dynamodb_item(self):
-#         """UserオブジェクトをDynamoDBアイテムに変換"""
-#         item = {
-#             "user_id": {"S": self.user_id},
-#             "organization": {"S": self.organization},
-#             "address": {"S": self.address},
-#             "administrator": {"BOOL": self.administrator},
-#             "created_at": {"S": self.created_at},
-#             "display_name": {"S": self.display_name},
-#             "email": {"S": self.email},
-#             "furigana": {"S": self.furigana},
-#             "gender": {"S": self.gender},
-#             "password": {"S": self.password_hash},
-#             "phone": {"S": self.phone},
-#             "post_code": {"S": self.post_code},
-#             "updated_at": {"S": self.updated_at},
-#             "user_name": {"S": self.user_name}
-#         }
-#         if self.date_of_birth:  # Noneの場合はスキップ
-#             item["date_of_birth"] = {"S": self.date_of_birth}
-#         return item
-
-#     def set_password(self, password):        
-#         self.password_hash = generate_password_hash(password)
-
-#     def check_password(self, password):        
-#         return check_password_hash(self.password_hash, password) 
-
-#     @property
-#     def password(self):
-#         raise AttributeError('password is not a readable attribute')
-
-#     @property
-#     def is_administrator(self):  # 管理者かどうかを確認するための別のプロパティ
-#         print(f"Checking administrator status: {self.administrator}")
-#         return self.administrator
-
-#     @property
-#     def is_admin(self):
-#         return self.administrator       
+      
 
 from flask_login import UserMixin
 from datetime import datetime
@@ -354,7 +218,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(UserMixin):
     def __init__(self, user_id, display_name, user_name, furigana, email, password_hash, 
-                 gender, date_of_birth, post_code, address, phone, 
+                 gender, date_of_birth, post_code, address, phone,guardian_name, emergency_phone, 
                  organization='uguis', administrator=False, 
                  created_at=None, updated_at=None):
         super().__init__()
@@ -369,6 +233,8 @@ class User(UserMixin):
         self.post_code = post_code
         self.address = address
         self.phone = phone
+        self.guardian_name = guardian_name  # 新しいフィールドを初期化
+        self.emergency_phone = emergency_phone  # 新しいフィールドを初期化
         self.organization = organization
         self.administrator = administrator
         self.created_at = created_at or datetime.now().isoformat()
@@ -394,6 +260,8 @@ class User(UserMixin):
             post_code=get_value('post_code'),
             address=get_value('address'),
             phone=get_value('phone'),
+            guardian_name=get_value('guardian_name', default=None),  # 新しいフィールド
+            emergency_phone=get_value('emergency_phone', default=None),  # 新しいフィールド
             organization=get_value('organization', default='uguis'),
             administrator=bool(get_value('administrator', 'BOOL', False)),
             created_at=get_value('created_at'),
@@ -632,7 +500,10 @@ def signup():
                     "phone": {"S": form.phone.data},
                     "post_code": {"S": form.post_code.data},
                     "updated_at": {"S": current_time},
-                    "user_name": {"S": form.user_name.data}
+                    "user_name": {"S": form.user_name.data},
+                    "guardian_name": {"S": form.guardian_name.data}, 
+                    "emergency_phone": {"S": form.emergency_phone.data}
+                    
                 },
                 ReturnValues="NONE"
             )
@@ -716,6 +587,8 @@ def login():
                     post_code=user_data['post_code'],
                     address=user_data['address'],
                     phone=user_data['phone'],
+                    guardian_name=user_data.get('guardian_name', None),  
+                    emergency_phone=user_data.get('emergency_phone', None), 
                     administrator=user_data['administrator']
                 )
                 
@@ -1052,6 +925,10 @@ def remove_user_id():
         return f'Processed {success_count + error_count} items. Success: {success_count}, Errors: {error_count}'
     except Exception as e:
         return f'Error: {str(e)}'
+    
+@app.route("/uguis2024_tournament")
+def uguis2024_tournament():
+    return render_template("uguis2024_tournament.html")
 
 
 # @app.route("/gallery", methods=["GET", "POST"])

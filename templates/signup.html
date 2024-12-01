@@ -5,7 +5,7 @@
     <div class="container my-5">
         <div class="row">
             <div class="col-lg-6 mx-auto">
-                <div class="card bg-primary text-center">
+                <div class="card text-center" style="background-color: #8ea604; border-color: #647503;">
                     <div class="card-body text-light">
                         <h3>ユーザー登録</h3>
                         <p>ユーザー情報を入力してください。</p>
@@ -25,18 +25,29 @@
                             </div>
                             <div class="mb-3">
                                 {{ render_field(form.gender, placeholder="性別", class="form-control form-control-lg") }}
-                            </div>
-                            
-                            <div class="mb-3">
-                                
-                                <label for="date_of_birth" class="form-label">生年月日</label>
-                                {{ render_field(form.date_of_birth, placeholder="生年月日", class="form-control form-control-lg") }}
-                                
-                            </div>                                                     
-                            
+                            </div> 
                             <div class="mb-3">
                                 {{ render_field(form.phone, placeholder="電話番号", class="form-control form-control-lg") }}
+                            </div> 
+                            
+                            <div class="mb-3">
+                                <label for="date_of_birth" class="form-label">生年月日</label>
+                                {{ render_field(form.date_of_birth, class="form-control form-control-lg") }}
                             </div>
+                            
+                            <!-- 保護者情報入力欄（デフォルトで非表示） -->
+                            <div id="guardianSection" style="display: none;">
+                                <div class="mb-3">
+                                    <label for="guardian_name" class="form-label">保護者氏名</label>
+                                    {{ render_field(form.guardian_name, class="form-control form-control-lg") }}
+                                </div>
+                                <div class="mb-3">
+                                    <label for="emergency_phone" class="form-label">緊急連絡先電話番号</label>
+                                    {{ render_field(form.emergency_phone, class="form-control form-control-lg") }}
+                                </div>
+                            </div>
+                            
+                            
 
                             <div class="mb-3">
                                 {{ render_field(form.post_code, placeholder="郵便番号", class="form-control form-control-lg") }}
@@ -64,6 +75,46 @@
                             
                             {{ form.submit(class="btn btn-outline-light w-100") }}
                         </form>
+
+                        <script>
+
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const birthdateInput = document.querySelector('input[name="date_of_birth"]');
+                                const guardianSection = document.getElementById('guardianSection');
+                            
+                                function calculateAge(birthdate) {
+                                    const today = new Date();
+                                    const birthDate = new Date(birthdate);
+                                    let age = today.getFullYear() - birthDate.getFullYear();
+                                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                                    
+                                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                                        age--;
+                                    }
+                                    return age;
+                                }
+                            
+                                function checkAge() {
+                                    if (birthdateInput.value) {
+                                        const age = calculateAge(birthdateInput.value);
+                                        console.log('Calculated age:', age); // デバッグ用
+                                        if (age < 18) {
+                                            guardianSection.style.display = 'block';
+                                        } else {
+                                            guardianSection.style.display = 'none';
+                                        }
+                                    }
+                                }
+                            
+                                // 初期チェック
+                                checkAge();
+                            
+                                // 生年月日が変更されたときのチェック
+                                birthdateInput.addEventListener('change', checkAge);
+                            });
+
+                        </script>
+
                     </div>
                 </div>
             </div>
