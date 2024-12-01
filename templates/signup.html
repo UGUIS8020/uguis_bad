@@ -13,7 +13,7 @@
                             {{ form.hidden_tag() }}
                             
                             <div class="mb-3">
-                                {{ render_field(form.display_name, placeholder="表示ネーム", class="form-control form-control-lg") }}
+                                {{ render_field(form.display_name, placeholder="表示名 LINE名など", class="form-control form-control-lg") }}
                             </div>
                             
                             <div class="mb-3">
@@ -28,8 +28,11 @@
                             </div>
                             
                             <div class="mb-3">
+                                
+                                <label for="date_of_birth" class="form-label">生年月日</label>
                                 {{ render_field(form.date_of_birth, placeholder="生年月日", class="form-control form-control-lg") }}
-                            </div>
+                                
+                            </div>                                                     
                             
                             <div class="mb-3">
                                 {{ render_field(form.phone, placeholder="電話番号", class="form-control form-control-lg") }}
