@@ -781,7 +781,7 @@ def delete_schedule(schedule_id):
 
 
 @app.route("/user_maintenance", methods=["GET", "POST"])
-# @login_required
+@login_required
 def user_maintenance():
     try:
         # テーブルからすべてのユーザーを取得
