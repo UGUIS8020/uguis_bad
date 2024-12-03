@@ -391,11 +391,49 @@ class ScheduleForm(FlaskForm):
     submit = SubmitField('登録')
 
 
+# class Board_Form(FlaskForm):
+#     title = StringField('タイトル', validators=[DataRequired()])
+#     content = StringField('内容', validators=[DataRequired()])
+#     submit = SubmitField('投稿')
+
+# def get_board_table():
+#     return dynamodb.Table('board_table')  # 実際のテーブル名に変更してください
+
+# @app.route('/board', methods=['GET', 'POST'])
+# def board():
+#     form = Board_Form()
+#     board_table = get_board_table()
+
+#     # DynamoDB から既存の投稿を取得
+#     try:
+#         response = board_table.scan()
+#         posts = response.get('Items', [])  # 投稿一覧
+#     except Exception as e:
+#         posts = []
+#         flash(f"データの取得に失敗しました: {str(e)}", "danger")
+
+#     # 新しい投稿を処理
+#     if form.validate_on_submit():
+#         try:
+#             # 投稿データを作成
+#             new_post = {
+#                 'title': form.title.data,
+#                 'content': form.content.data,
+#                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+#             }
+#             board_table.put_item(Item=new_post)
+#             flash('投稿が成功しました！', 'success')
+#             return redirect(url_for('board'))
+#         except Exception as e:
+#             flash(f"投稿に失敗しました: {str(e)}", "danger")
+
+#     # テンプレートをレンダリング
+#     return render_template('board.html', form=form, posts=posts)
+
+
 def get_schedule_table():
     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
     return dynamodb.Table('Schedule')
-
-
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
@@ -1050,8 +1088,7 @@ def delete_image(filename):
 
 @app.route("/videos")
 def video_link():
-    return render_template("video_link.html")
-    
+    return render_template("video_link.html")    
 
 @app.route("/<int:id>/delete")
 # @login_required
