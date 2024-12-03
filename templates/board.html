@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}掲示板{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-4">掲示板</h1>
+
+    <!-- 投稿フォーム -->
+    <div class="card mb-4">
+        <div class="card-header">
+            投稿フォーム
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.title.label(class="form-label") }}
+                    {{ form.title(class="form-control", placeholder="タイトルを入力してください") }}
+                    {% for error in form.title.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.content.label(class="form-label") }}
+                    {{ form.content(class="form-control", placeholder="内容を入力してください") }}
+                    {% for error in form.content.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="text-center">
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 投稿一覧 -->
+    <div class="card">
+        <div class="card-header">
+            投稿一覧
+        </div>
+        <ul class="list-group list-group-flush">
+            {% for post in posts %}
+                <li class="list-group-item">
+                    <h5>{{ post.title }}</h5>
+                    <p>{{ post.content }}</p>
+                    <small class="text-muted">投稿日: {{ post.created_at }}</small>
+                </li>
+            {% else %}
+                <li class="list-group-item text-center">
+                    投稿はまだありません。
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

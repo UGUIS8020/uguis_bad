@@ -180,6 +180,12 @@
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
           </button>
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="#">お知らせ</a>
+            </li>
+          </ul>
+
           <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
@@ -224,12 +230,7 @@
         </div>
       </nav>
       
-      <!-- <div class="container" style="padding-top: 4rem; padding-bottom: 4rem;">
-        <div class="alert alert-warning alert-dismissible fade show" role="alert">
-            flashメッセージ
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>    
-        </div>
-      </div> -->
+      
   </header>
 
   {% from "_formhelpers.html" import render_field %}
@@ -238,11 +239,15 @@
   {% endfor %}
 
 
-  
+  {% block content %}
 
-    {% block content %}
-    
-    {% endblock %}
   
+  {% endblock %}
+
+  <footer class="bg-dark text-white py-3 mt-5">
+    <div class="container text-center">
+        <p>&copy; 2024 鶯 Badminton Club. All Rights Reserved.</p>
+    </div>
+  </footer>  
 </body>
 </html>
