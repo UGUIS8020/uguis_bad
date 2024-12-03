@@ -195,10 +195,10 @@
                 </li>
 
                 <li class="nav-item">                   
-                  {% if current_user.is_authenticated and current_user.is_admin %}           
+                  {% if current_user.is_authenticated and current_user.administrator %}           
                   <a class="nav-link" href="{{ url_for('user_maintenance') }}">登録者</a>
                   {% endif %}                
-                  </li>              
+              </li>                        
                                         
                 
                 {% if current_user.is_authenticated %}
@@ -211,11 +211,13 @@
                 </li>
                 {% endif %}   
 
-                {% if current_user.is_authenticated %}
-                <span class="navbar-text ms-3 text-highlight">
-                  {{ current_user.display_name }}
-               </span>              
-               {% endif %}
+                <li class="nav-item">
+                  {% if current_user.is_authenticated %}
+                  <a class="nav-link fw-bold text-warning" href="{{ url_for('account', user_id=current_user.get_id()) }}">
+                      {{ current_user.display_name }}
+                  </a>
+                  {% endif %}
+                </li>
                          
             </ul>
           </div>
