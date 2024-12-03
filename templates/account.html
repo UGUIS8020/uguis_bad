@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-    <!-- {% if current_user.is_administrator %} -->
+    
         <section id="menu">
         <div class="container my-3 py-4 bg-light">
             <div class="row">
@@ -11,8 +11,8 @@
                 </div>
             </div>
         </div>
-    </section>
-    {% endif %}
+    </section>   
+    
 
     <section id="user_update">
         <div class="container my-3">
@@ -48,8 +48,8 @@
                                     {{ render_field(form.date_of_birth, class="form-control form-control-lg") }}
                                 </div>
                                 
-                                <!-- 保護者情報入力欄（デフォルトで非表示） -->
-                                <div id="guardianSection" style="display: none;">
+                                
+                                <div class="mb-3">
                                     <div class="mb-3">
                                         <label for="guardian_name" class="form-label">保護者氏名</label>
                                         {{ render_field(form.guardian_name, class="form-control form-control-lg") }}
@@ -87,46 +87,8 @@
                                 </div>                                                    
                                 
                                 {{ form.submit(class="btn btn-outline-light w-100") }}
-                            </form>
-    
-                            <script>
-    
-                                document.addEventListener('DOMContentLoaded', function() {
-                                    const birthdateInput = document.querySelector('input[name="date_of_birth"]');
-                                    const guardianSection = document.getElementById('guardianSection');
-                                
-                                    function calculateAge(birthdate) {
-                                        const today = new Date();
-                                        const birthDate = new Date(birthdate);
-                                        let age = today.getFullYear() - birthDate.getFullYear();
-                                        const monthDiff = today.getMonth() - birthDate.getMonth();
-                                        
-                                        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                                            age--;
-                                        }
-                                        return age;
-                                    }
-                                
-                                    function checkAge() {
-                                        if (birthdateInput.value) {
-                                            const age = calculateAge(birthdateInput.value);
-                                            console.log('Calculated age:', age); // デバッグ用
-                                            if (age < 18) {
-                                                guardianSection.style.display = 'block';
-                                            } else {
-                                                guardianSection.style.display = 'none';
-                                            }
-                                        }
-                                    }
-                                
-                                    // 初期チェック
-                                    checkAge();
-                                
-                                    // 生年月日が変更されたときのチェック
-                                    birthdateInput.addEventListener('change', checkAge);
-                                });
-    
-                            </script>
+                            </form>    
+                            
     
         </div>
       </div>
