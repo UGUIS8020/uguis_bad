@@ -24,43 +24,110 @@
                             <p>ユーザー情報を変更してください。</p>
                             <form method="POST">
                                 {{ form.hidden_tag() }}
+                                
                                 <div class="mb-3">
-                                    {{ render_field(form.username, class="form-control form-control-lg", placeholder="ユーザー名") }}
+                                    {{ render_field(form.display_name, placeholder="表示名 LINE名など", class="form-control form-control-lg") }}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ render_field(form.user_name, placeholder="名前", class="form-control form-control-lg") }}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ render_field(form.furigana, placeholder="フリガナ", class="form-control form-control-lg") }}
                                 </div>
                                 <div class="mb-3">
-                                    {{ render_field(form.email, class="form-control form-control-lg", placeholder="メールアドレス") }}
-                                </div>
-                                <hr>
+                                    {{ render_field(form.gender, placeholder="性別", class="form-control form-control-lg") }}
+                                </div> 
                                 <div class="mb-3">
-                                    {{ render_field(form.password, class="form-control form-control-lg", placeholder="新パスワード") }}
-                                </div>
+                                    {{ render_field(form.phone, placeholder="電話番号", class="form-control form-control-lg") }}
+                                </div> 
+                                
                                 <div class="mb-3">
-                                    {{ render_field(form.pass_confirm, class="form-control form-control-lg", placeholder="新パスワード(確認)") }}
-                                </div>                                             {{ form.submit(class="btn btn-outline-light w-100", value="更新") }}                 
+                                    <label for="date_of_birth" class="form-label">生年月日</label>
+                                    {{ render_field(form.date_of_birth, class="form-control form-control-lg") }}
+                                </div>
+                                
+                                <!-- 保護者情報入力欄（デフォルトで非表示） -->
+                                <div id="guardianSection" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="guardian_name" class="form-label">保護者氏名</label>
+                                        {{ render_field(form.guardian_name, class="form-control form-control-lg") }}
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="emergency_phone" class="form-label">緊急連絡先電話番号</label>
+                                        {{ render_field(form.emergency_phone, class="form-control form-control-lg") }}
+                                    </div>
+                                </div>
+                                
+                                
+    
+                                <div class="mb-3">
+                                    {{ render_field(form.post_code, placeholder="郵便番号", class="form-control form-control-lg") }}
+                                </div>
+    
+                                <div class="mb-3">
+                                    {{ render_field(form.address, placeholder="住所", class="form-control form-control-lg") }}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ render_field(form.email, placeholder="メールアドレス", class="form-control form-control-lg") }}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ render_field(form.email_confirm, placeholder="メールアドレス(確認)", class="form-control form-control-lg") }}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ render_field(form.password, placeholder="パスワード", class="form-control form-control-lg") }}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ render_field(form.pass_confirm, placeholder="パスワード(確認)", class="form-control form-control-lg") }}
+                                </div>                                                    
+                                
+                                {{ form.submit(class="btn btn-outline-light w-100") }}
                             </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-  
-  <!-- Modal -->
-  <div class="modal fade" id="del_modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="exampleModalLabel">削除確認</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p>このユーザーを削除しますか？</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-          <form action="{{ url_for('delete_user', user_id=form.id) }}" method="POST">
-              <input type="submit" class="btn btn-danger" value="削除">
-          </form>
+    
+                            <script>
+    
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    const birthdateInput = document.querySelector('input[name="date_of_birth"]');
+                                    const guardianSection = document.getElementById('guardianSection');
+                                
+                                    function calculateAge(birthdate) {
+                                        const today = new Date();
+                                        const birthDate = new Date(birthdate);
+                                        let age = today.getFullYear() - birthDate.getFullYear();
+                                        const monthDiff = today.getMonth() - birthDate.getMonth();
+                                        
+                                        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                                            age--;
+                                        }
+                                        return age;
+                                    }
+                                
+                                    function checkAge() {
+                                        if (birthdateInput.value) {
+                                            const age = calculateAge(birthdateInput.value);
+                                            console.log('Calculated age:', age); // デバッグ用
+                                            if (age < 18) {
+                                                guardianSection.style.display = 'block';
+                                            } else {
+                                                guardianSection.style.display = 'none';
+                                            }
+                                        }
+                                    }
+                                
+                                    // 初期チェック
+                                    checkAge();
+                                
+                                    // 生年月日が変更されたときのチェック
+                                    birthdateInput.addEventListener('change', checkAge);
+                                });
+    
+                            </script>
+    
         </div>
       </div>
     </div>
