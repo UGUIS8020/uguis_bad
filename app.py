@@ -799,83 +799,7 @@ def user_maintenance():
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('ユーザー情報の取得に失敗しました。', 'error')
         return redirect(url_for('index'))
-
-
-# @app.route('/account/<string:user_id>', methods=['GET', 'POST'])  # UUIDは文字列なのでintからstringに変更
-# # @login_required
-# def account(user_id):
-#     # DynamoDBからユーザー情報を取得
-#     try:
-#         response = app.dynamodb.get_item(
-#             TableName=app.table_name,
-#             Key={
-#                 'user_id': {'S': user_id}
-#             }
-#         )
-#         user = response.get('Item')
-#         if not user:
-#             abort(404)
-            
-#         # 現在のユーザーが対象ユーザーまたは管理者であることを確認
-#         if user['user_id']['S'] != current_user.get_id() and not current_user.administrator:
-#             abort(403)
-        
-#         form = UpdateUserForm(user_id=user_id, dynamodb_table=app.table)
-        
-#         if form.validate_on_submit():
-#             current_time = datetime.now().isoformat()
-            
-#             # パスワードが入力された場合はハッシュ化
-#             update_expression_parts = []
-#             expression_values = {}
-            
-#             # 更新する項目を設定
-#             if form.display_name.data:
-#                 update_expression_parts.append("display_name = :display_name")
-#                 expression_values[':display_name'] = {'S': form.display_name.data}
-
-#             if form.user_name.data:
-#                 update_expression_parts.append("user_name = :user_name")
-#                 expression_values[':user_name'] = {'S': form.user_name.data}
-                
-#             if form.email.data:
-#                 update_expression_parts.append("email = :email")
-#                 expression_values[':email'] = {'S': form.email.data}
-                
-#             if form.password.data:
-#                 hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256')
-#                 update_expression_parts.append("password = :password")
-#                 expression_values[':password'] = {'S': hashed_password}
-
-#             # 更新日時は常に更新
-#             update_expression_parts.append("updated_at = :updated_at")
-#             expression_values[':updated_at'] = {'S': current_time}
-
-#             # DynamoDBを更新
-#             response = app.dynamodb.update_item(
-#                 TableName=app.table_name,
-#                 Key={
-#                     'user_id': {'S': user_id}
-#                 },
-#                 UpdateExpression="SET " + ", ".join(update_expression_parts),
-#                 ExpressionAttributeValues=expression_values,
-#                 ReturnValues="UPDATED_NEW"
-#             )
-            
-#             flash('ユーザーアカウントが更新されました', 'success')
-#             return redirect(url_for('user_maintenance'))
-            
-#         elif request.method == 'GET':
-#             # フォームに現在の値を設定
-#             form.user_name.data = user.get('user_name', {}).get('S', '')
-#             form.email.data = user.get('email', {}).get('S', '')
-            
-#         return render_template('account.html', form=form)
-        
-#     except ClientError as e:
-#         app.logger.error(f"DynamoDB error: {str(e)}")
-#         flash('データベースエラーが発生しました。', 'error')
-#         return redirect(url_for('user_maintenance'))   
+      
 
 @app.route("/table_info")
 def get_table_info():
@@ -950,6 +874,11 @@ def account(user_id):
         form = UpdateUserForm(user_id=user_id, dynamodb_table=app.table)
         
         if request.method == 'GET':
+              # 任意フィールドは存在チェックを行う
+            if 'guardian_name' in user:
+                form.guardian_name.data = user['guardian_name']['S']
+            if 'emergency_phone' in user:
+                form.emergency_phone.data = user['emergency_phone']['S']
             # GETリクエスト時はフォームに値を設定するだけ
             form.display_name.data = user['display_name']['S']
             form.user_name.data = user['user_name']['S']
@@ -959,10 +888,11 @@ def account(user_id):
             form.post_code.data = user['post_code']['S']
             form.address.data = user['address']['S']
             form.gender.data = user['gender']['S']
-            form.date_of_birth.data = datetime.strptime(user['date_of_birth']['S'], '%Y-%m-%d')
-            form.guardian_name.data = user['guardian_name']['S']
-            form.emergency_phone.data = user['emergency_phone']['S']
+            form.date_of_birth.data = datetime.strptime(user['date_of_birth']['S'], '%Y-%m-%d')            
             form.organization.data = user['organization']['S']
+# 　　　　　　　任意のフィールド
+            form.guardian_name.data = user.get('guardian_name', {}).get('S', '')            
+            form.emergency_phone.data = user.get('emergency_phone', {}).get('S', '')
             
         elif form.validate_on_submit():  # POSTリクエストの処理
             current_time = datetime.now().isoformat()
@@ -988,67 +918,52 @@ def account(user_id):
             flash('ユーザーアカウントが更新されました', 'success')
             return redirect(url_for('user_maintenance'))
         
-        return render_template('account.html', form=form)
+        return render_template('account.html', form=form, user=user)
         
     except ClientError as e:
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('データベースエラーが発生しました。', 'error')
         return redirect(url_for('user_maintenance'))   
+    
+
+@app.route("/delete_user/<string:user_id>")
+def delete_user(user_id):
+    try:
+        response = app.dynamodb.get_item(
+            TableName=app.table_name,
+            Key={
+                'user_id': {'S': user_id}
+            }
+        )
+        user = response.get('Item')
+        
+        if not user:
+            flash('ユーザーが見つかりません。', 'error')
+            return redirect(url_for('user_maintenance'))
+            
+        # 管理者のみ削除可能
+        if not current_user.administrator:
+            abort(403)  # 権限がない場合は403エラー
+        
+        # ここで実際の削除処理を実行
+        app.dynamodb.delete_item(
+            TableName=app.table_name,
+            Key={
+                'user_id': {'S': user_id}
+            }
+        )
+
+        flash('ユーザーアカウントが削除されました', 'success')
+        return redirect(url_for('user_maintenance'))
+    except ClientError as e:
+        app.logger.error(f"DynamoDB error: {str(e)}")
+        flash('データベースエラーが発生しました。', 'error')
+        return redirect(url_for('user_maintenance'))
 
     
 @app.route("/uguis2024_tournament")
 def uguis2024_tournament():
     return render_template("uguis2024_tournament.html")
-
-
-# @app.route("/gallery", methods=["GET", "POST"])
-# def gallery():
-#     posts = []
-
-#     if request.method == "POST":
-#         image = request.files.get("image")
-#         if image and image.filename != '':
-#             original_filename = secure_filename(image.filename)
-#             unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-
-#             img = Image.open(image)
-#             max_width = 1500
-
-#             # 画像の横幅が1500pxを超えている場合に縮小
-#             if img.width > max_width:
-#                 # アスペクト比を維持したままリサイズ
-#                 new_height = int((max_width / img.width) * img.height)                
-#                 img = img.resize((max_width, new_height), Image.LANCZOS)
-
-#             # リサイズされた画像をバイトIOオブジェクトに保存
-#             img_byte_arr = io.BytesIO()
-#             img.save(img_byte_arr, format='JPEG')
-#             img_byte_arr.seek(0)
-
-#             # appを直接参照
-#             app.s3.upload_fileobj(
-#                 img_byte_arr,
-#                 app.config["S3_BUCKET"],
-#                 unique_filename
-#             )
-#             image_url = f"{app.config['S3_LOCATION']}{unique_filename}"
-
-#             print(f"Uploaded Image URL: {image_url}")
-#             return redirect(url_for("gallery"))  # POST後はGETリクエストにリダイレクト
-
-#     # GETリクエスト: S3バケット内の画像を取得
-#     try:
-#         response = app.s3.list_objects_v2(Bucket=app.config["S3_BUCKET"])
-#         if "Contents" in response:
-#             for obj in response["Contents"]:
-#                 print(f"Found object key: {obj['Key']}")  # 取得したキーをデバッグ出力
-#                 posts.append({
-#                     "image_url": f"{app.config['S3_LOCATION']}{obj['Key']}"
-#                 })
-#     except Exception as e:
-#         print(f"Error fetching images from S3: {e}")
-
-#     return render_template("gallery.html", posts=posts)
 
 
 @app.route("/gallery", methods=["GET", "POST"])

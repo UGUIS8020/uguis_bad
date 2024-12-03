@@ -1,23 +1,44 @@
 {% extends "base.html" %}
 {% block content %}
     
-        <section id="menu">
-        <div class="container my-3 py-4 bg-light">
-            <div class="row">
-                <div class="col-md-3">
-                    <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#del_modal">
-                        削除
-                    </button>
-                </div>
+    <!-- 削除ボタン -->
+<section id="menu">
+    <div class="container my-3 py-4 bg-light">
+        <div class="row">
+            <div class="col-md-3">
+                <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#del_modal">
+                    削除
+                </button>
             </div>
         </div>
-    </section>   
+    </div>
+</section>
+
+<!-- 削除確認モーダル -->
+<div class="modal fade" id="del_modal" tabindex="-1" aria-labelledby="del_modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="del_modalLabel">アカウント削除の確認</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                このアカウントを削除してもよろしいですか？
+                <br>この操作は取り消せません。
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <a href="{{ url_for('delete_user', user_id=user.user_id['S']) }}" class="btn btn-danger">削除する</a>
+            </div>
+        </div>
+    </div>
+</div>   
     
 
     <section id="user_update">
         <div class="container my-3">
             <div class="row">
-                <div class="col-lg-4 mx-auto">
+                <div class="col-lg-5 mx-auto">
                     <div class="card bg-success text-center">
                         <div class="card-body text-light">
                             <h3>ユーザー更新</h3>
@@ -26,20 +47,27 @@
                                 {{ form.hidden_tag() }}
                                 
                                 <div class="mb-3">
+                                    <label for="date_of_birth" class="form-label">表示ネーム</label>
                                     {{ render_field(form.display_name, placeholder="表示名 LINE名など", class="form-control form-control-lg") }}
                                 </div>
                                 
                                 <div class="mb-3">
+                                    <label for="date_of_birth" class="form-label">本名</label>
                                     {{ render_field(form.user_name, placeholder="名前", class="form-control form-control-lg") }}
                                 </div>
                                 
                                 <div class="mb-3">
+                                    <label for="date_of_birth" class="form-label">フリガナ</label>
                                     {{ render_field(form.furigana, placeholder="フリガナ", class="form-control form-control-lg") }}
                                 </div>
+
                                 <div class="mb-3">
+                                    <label for="date_of_birth" class="form-label">性別</label>
                                     {{ render_field(form.gender, placeholder="性別", class="form-control form-control-lg") }}
                                 </div> 
+
                                 <div class="mb-3">
+                                    <label for="date_of_birth" class="form-label">携帯番号</label>
                                     {{ render_field(form.phone, placeholder="電話番号", class="form-control form-control-lg") }}
                                 </div> 
                                 
@@ -63,26 +91,32 @@
                                 
     
                                 <div class="mb-3">
+                                    <label for="emergency_phone" class="form-label">郵便番号</label>
                                     {{ render_field(form.post_code, placeholder="郵便番号", class="form-control form-control-lg") }}
                                 </div>
     
                                 <div class="mb-3">
+                                    <label for="emergency_phone" class="form-label">住所</label>
                                     {{ render_field(form.address, placeholder="住所", class="form-control form-control-lg") }}
                                 </div>
                                 
                                 <div class="mb-3">
+                                    <label for="emergency_phone" class="form-label">メールアドレス</label>
                                     {{ render_field(form.email, placeholder="メールアドレス", class="form-control form-control-lg") }}
                                 </div>
                                 
                                 <div class="mb-3">
+                                    <label for="emergency_phone" class="form-label">メールアドレス(確認)</label>
                                     {{ render_field(form.email_confirm, placeholder="メールアドレス(確認)", class="form-control form-control-lg") }}
                                 </div>
                                 
                                 <div class="mb-3">
+                                    <label for="emergency_phone" class="form-label">パスワード</label>
                                     {{ render_field(form.password, placeholder="パスワード", class="form-control form-control-lg") }}
                                 </div>
                                 
                                 <div class="mb-3">
+                                    <label for="emergency_phone" class="form-label">パスワード(確認)</label>
                                     {{ render_field(form.pass_confirm, placeholder="パスワード(確認)", class="form-control form-control-lg") }}
                                 </div>                                                    
                                 
