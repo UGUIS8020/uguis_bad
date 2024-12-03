@@ -57,7 +57,7 @@
                                         <td>{{ user.emergency_phone | truncate(15) }}</td>                                       
                                         <td>
                                             
-                                            <a href="{{ url_for('account', user_id=user.id) }}" class="btn btn-secondary">変更</a>
+                                            <a href="{{ url_for('account', user_id=user.user_id) }}" class="btn btn-secondary">変更</a>
                                                
                                             
                                         </td>
