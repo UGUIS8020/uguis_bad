@@ -50,7 +50,7 @@ def create_app():
         }
 
         # 必須環境変数のチェック
-        required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET", "TABLE_NAME", "TABLE_NAME_SCHEDULE"]
+        required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET", "TABLE_NAME_USER", "TABLE_NAME_SCHEDULE"]
         missing_vars = [var for var in required_env_vars if not os.getenv(var)]
         if missing_vars:
             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
@@ -67,7 +67,7 @@ def create_app():
         app.dynamodb_resource = boto3.resource('dynamodb', **aws_credentials)
 
         # DynamoDBテーブルの設定
-        app.table_name = os.getenv("TABLE_NAME")
+        app.table_name = os.getenv("TABLE_NAME_USER")
         app.table_name_schedule = os.getenv("TABLE_NAME_SCHEDULE")
         app.table = app.dynamodb_resource.Table(app.table_name)
         app.table_schedule = app.dynamodb_resource.Table(app.table_name_schedule)
@@ -106,9 +106,13 @@ def load_user(user_id):
     try:
         response = app.dynamodb.get_item(
             TableName=app.table_name,
-            Key={'user_id': {'S': user_id}}
+                Key={
+                "user#user_id": {"S": user_id}  
+            }
         )
         
+
+
         app.logger.debug(f"DynamoDB response: {response}")
 
         if 'Item' in response:
@@ -191,7 +195,7 @@ class UpdateUserForm(FlaskForm):
 
     def __init__(self, user_id, dynamodb_table, *args, **kwargs):
         super(UpdateUserForm, self).__init__(*args, **kwargs)
-        self.id = user_id
+        self.id = f'user#{user_id}'
         self.table = dynamodb_table
 
     def validate_email(self, field):
@@ -208,7 +212,7 @@ class UpdateUserForm(FlaskForm):
             # 検索結果があり、かつ自分以外のユーザーの場合はエラー
             if response.get('Items'):
                 for item in response['Items']:
-                    if item['user_id'] != self.id:
+                    if item['user_id']['S'] != f'user#{self.id}':
                         raise ValidationError('このメールアドレスは既に使用されています。')
                         
         except ClientError as e:
@@ -223,7 +227,7 @@ class User(UserMixin):
                  organization='uguis', administrator=False, 
                  created_at=None, updated_at=None):
         super().__init__()
-        self.user_id = user_id
+        self.user_id = user_id if user_id.startswith('user#') else f'user#{user_id}'
         self.display_name = display_name
         self.user_name = user_name
         self.furigana = furigana
@@ -250,7 +254,7 @@ class User(UserMixin):
             return item.get(field, {}).get(field_type, default)
 
         return User(
-            user_id=get_value('user_id'),
+            user_id=get_value('user#user_id'),
             display_name=get_value('display_name'),
             user_name=get_value('user_name'),
             furigana=get_value('furigana'),
@@ -272,11 +276,11 @@ class User(UserMixin):
     def to_dynamodb_item(self):
         fields = ['user_id', 'organization', 'address', 'administrator', 'created_at', 
                   'display_name', 'email', 'furigana', 'gender', 'password', 
-                  'phone', 'post_code', 'updated_at', 'user_name']
+                  'phone', 'post_code', 'updated_at', 'user_name','guardian_name', 'emergency_phone']
         item = {field: {"S": str(getattr(self, field))} for field in fields if getattr(self, field, None)}
         item['administrator'] = {"BOOL": self.administrator}
         if self.date_of_birth:
-            item['date_of_birth'] = {"S": self.date_of_birth}
+            item['date_of_birth'] = {"S": str(self.date_of_birth)}
         return item
 
     def set_password(self, password):
@@ -300,7 +304,8 @@ def get_user_from_dynamodb(user_id):
         # DynamoDBからユーザーデータを取得
         response = app.dynamodb.get_item(
             TableName=app.table_name,
-            Key={"user_id": {"S": user_id}}
+            Key={"user#user_id": {"S": user_id}}
+            
         )
         
         # データが存在しない場合
@@ -390,44 +395,44 @@ class ScheduleForm(FlaskForm):
     submit = SubmitField('登録')
 
 
-# class Board_Form(FlaskForm):
-#     title = StringField('タイトル', validators=[DataRequired()])
-#     content = StringField('内容', validators=[DataRequired()])
-#     submit = SubmitField('投稿')
+class Board_Form(FlaskForm):
+    title = StringField('タイトル', validators=[DataRequired()])
+    content = StringField('内容', validators=[DataRequired()])
+    submit = SubmitField('投稿')
 
-# def get_board_table():
-#     return dynamodb.Table('board_table')  # 実際のテーブル名に変更してください
+def get_board_table():
+    return app.dynamodb.Table('bad-board-table')  # 実際のテーブル名に変更してください
 
-# @app.route('/board', methods=['GET', 'POST'])
-# def board():
-#     form = Board_Form()
-#     board_table = get_board_table()
+@app.route('/board', methods=['GET', 'POST'])
+def board():
+    form = Board_Form()
+    board_table = get_board_table()
 
-#     # DynamoDB から既存の投稿を取得
-#     try:
-#         response = board_table.scan()
-#         posts = response.get('Items', [])  # 投稿一覧
-#     except Exception as e:
-#         posts = []
-#         flash(f"データの取得に失敗しました: {str(e)}", "danger")
+    # DynamoDB から既存の投稿を取得
+    try:
+        response = board_table.scan()
+        posts = response.get('Items', [])  # 投稿一覧
+    except Exception as e:
+        posts = []
+        flash(f"データの取得に失敗しました: {str(e)}", "danger")
 
-#     # 新しい投稿を処理
-#     if form.validate_on_submit():
-#         try:
-#             # 投稿データを作成
-#             new_post = {
-#                 'title': form.title.data,
-#                 'content': form.content.data,
-#                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-#             }
-#             board_table.put_item(Item=new_post)
-#             flash('投稿が成功しました！', 'success')
-#             return redirect(url_for('board'))
-#         except Exception as e:
-#             flash(f"投稿に失敗しました: {str(e)}", "danger")
+    # 新しい投稿を処理
+    if form.validate_on_submit():
+        try:
+            # 投稿データを作成
+            new_post = {
+                'title': form.title.data,
+                'content': form.content.data,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            board_table.put_item(Item=new_post)
+            flash('投稿が成功しました！', 'success')
+            return redirect(url_for('board'))
+        except Exception as e:
+            flash(f"投稿に失敗しました: {str(e)}", "danger")
 
-#     # テンプレートをレンダリング
-#     return render_template('board.html', form=form, posts=posts)
+    # テンプレートをレンダリング
+    return render_template('board.html', form=form, posts=posts)
 
 
 def get_schedule_table():
@@ -524,8 +529,8 @@ def signup():
             # ユーザーの保存
             response = app.dynamodb.put_item(
                 TableName=app.table_name,
-                Item={
-                    "user_id": {"S": user_id},
+                Item={                    
+                    "user#user_id": {"S": f"user#{user_id}"},
                     "organization": {"S": form.organization.data},  # 所属を追加
                     "address": {"S": form.address.data},
                     "administrator": {"BOOL": False},
@@ -589,13 +594,18 @@ def signup():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
 
+    print("あ")
+
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+    
+    print("い")
 
     # form = LoginForm(dynamodb_table=app.table)
     form = LoginForm()
     if form.validate_on_submit():
         try:
+            print("う")
             # メールアドレスでユーザーを取得
             response = app.table.query(
                 IndexName='email-index',
@@ -615,7 +625,7 @@ def login():
 
             try:
                 user = User(
-                    user_id=user_data['user_id'],
+                    user_id=user_data['user#user_id'],
                     display_name=user_data['display_name'],
                     user_name=user_data['user_name'],
                     furigana=user_data['furigana'],
@@ -895,7 +905,7 @@ def account(user_id):
         response = app.dynamodb.get_item(
             TableName=app.table_name,
             Key={
-                'user_id': {'S': user_id}
+                'user#user_id': {'S': user_id}                
             }
         )
         user = response.get('Item')
@@ -945,7 +955,7 @@ def account(user_id):
             response = app.dynamodb.update_item(
                 TableName=app.table_name,
                 Key={
-                    'user_id': {'S': user_id}
+                    'user#user_id': {'S': user_id}                    
                 },               
                 UpdateExpression="SET " + ", ".join(update_expression_parts),
                 ExpressionAttributeValues=expression_values,
@@ -969,7 +979,7 @@ def delete_user(user_id):
         response = app.dynamodb.get_item(
             TableName=app.table_name,
             Key={
-                'user_id': {'S': user_id}
+                'user#user_id': {'S': user_id}
             }
         )
         user = response.get('Item')
@@ -986,7 +996,7 @@ def delete_user(user_id):
         app.dynamodb.delete_item(
             TableName=app.table_name,
             Key={
-                'user_id': {'S': user_id}
+                'user#user_id': {'S': user_id}
             }
         )
 

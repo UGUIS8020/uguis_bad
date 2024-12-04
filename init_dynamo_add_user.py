@@ -20,12 +20,22 @@ def create_app():
         region_name=os.getenv("AWS_REGION", "ap-northeast-1")
     )
     
-    # テーブル名の設定
-    environment = os.getenv("ENVIRONMENT")
-    app.table_name = f"{environment}-users"    
-    app.table = app.dynamodb.Table(app.table_name)
+      # テーブル名の設定
+    environment = os.getenv("TABLE_NAME_USER")
+    if not environment:
+        raise ValueError("TABLE_NAME_USER is not set. Please provide a valid table name in the TABLE_NAME_USER variable.")
+    app.table_name = environment
+
+      # DynamoDBテーブルの取得
+    try:
+        app.table = app.dynamodb.Table(app.table_name)
+        print(f"Table initialized: {app.table}")  # デバッグ用の出力
+    except Exception as e:
+        print(f"Failed to initialize DynamoDB table: {e}")
+        raise
+
+    return app    
     
-    return app
 
 def generate_user_id(prefix: str = "user") -> str:
     """UUIDベースのユーザーID生成"""
@@ -33,77 +43,58 @@ def generate_user_id(prefix: str = "user") -> str:
 
 def create_user_table_if_not_exists(app):
     """ユーザーテーブルが存在しない場合は作成する"""
+    client = app.dynamodb.meta.client
+
     try:
-        # テーブルの存在確認
-        app.table.table_status
-        print(f"テーブル {app.table_name} は既に存在します")
+        existing_tables = client.list_tables()['TableNames']
+        if app.table_name in existing_tables:
+            print(f"テーブル {app.table_name} は既に存在します")
+            return app.dynamodb.Table(app.table_name)
+
+        # テーブル作成
+        table = app.dynamodb.create_table(
+            TableName=app.table_name,
+            KeySchema=[
+                {'AttributeName': 'user#user_id', 'KeyType': 'HASH'},  # パーティションキー
+            ],
+            AttributeDefinitions=[
+                {'AttributeName': 'user#user_id', 'AttributeType': 'S'},
+                {'AttributeName': 'email', 'AttributeType': 'S'},
+                {'AttributeName': 'organization', 'AttributeType': 'S'},
+                {'AttributeName': 'created_at', 'AttributeType': 'S'}
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    'IndexName': 'email-index',
+                    'KeySchema': [{'AttributeName': 'email', 'KeyType': 'HASH'}],
+                    'Projection': {'ProjectionType': 'ALL'}
+                },
+                {
+                    'IndexName': 'organization-index',
+                    'KeySchema': [
+                        {'AttributeName': 'organization', 'KeyType': 'HASH'},
+                        {'AttributeName': 'created_at', 'KeyType': 'RANGE'}
+                    ],
+                    'Projection': {'ProjectionType': 'ALL'}
+                }
+            ],
+            BillingMode='PAY_PER_REQUEST'
+        )
+        
+        print(f"テーブル {app.table_name} を作成中...")
+        table.meta.client.get_waiter('table_exists').wait(TableName=app.table_name)
+        print(f"テーブル {app.table_name} が作成されました")
+        return table
+
     except ClientError as e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            # テーブルが存在しない場合は作成
-            table = app.dynamodb.create_table(
-                TableName=app.table_name,
-                KeySchema=[
-                    {
-                        'AttributeName': 'user_id',
-                        'KeyType': 'HASH'  # Partition key
-                    }
-                ],
-                AttributeDefinitions=[
-                    {
-                        'AttributeName': 'user_id',
-                        'AttributeType': 'S'
-                    },
-                    {
-                        'AttributeName': 'email',
-                        'AttributeType': 'S'
-                    },
-                    {
-                        'AttributeName': 'organization',
-                        'AttributeType': 'S'
-                    },
-                    {
-                        'AttributeName': 'created_at',
-                        'AttributeType': 'S'
-                    }
-                ],
-                GlobalSecondaryIndexes=[
-                    {
-                        'IndexName': 'email-index',
-                        'KeySchema': [
-                            {
-                                'AttributeName': 'email',
-                                'KeyType': 'HASH'
-                            }
-                        ],
-                        'Projection': {
-                            'ProjectionType': 'ALL'
-                        }
-                    },
-                    {
-                        'IndexName': 'organization-index',
-                        'KeySchema': [
-                            {
-                                'AttributeName': 'organization',
-                                'KeyType': 'HASH'
-                            },
-                            {
-                                'AttributeName': 'created_at',
-                                'KeyType': 'RANGE'
-                            }
-                        ],
-                        'Projection': {
-                            'ProjectionType': 'ALL'
-                        }
-                    }
-                ],
-                BillingMode='PAY_PER_REQUEST'
-            )
-            # テーブルが作成されるまで待機
-            table.wait_until_exists()
-            print(f"テーブル {app.table_name} が作成されました")
-            return table
+        if e.response['Error']['Code'] == 'ResourceInUseException':
+            print(f"テーブル {app.table_name} は既に存在します")
+            return app.dynamodb.Table(app.table_name)
         else:
             raise e
+    except Exception as e:
+        print(f"予期せぬエラーが発生しました: {str(e)}")
+        return None
 
 def date_to_iso(d):
     """date型をISO形式の文字列に変換"""
@@ -116,10 +107,7 @@ def get_user_by_email(app, email: str) -> Optional[Dict[str, Any]]:
     try:
         response = app.table.query(
             IndexName='email-index',
-            KeyConditionExpression='email = :email',
-            ExpressionAttributeValues={
-                ':email': email
-            }
+            KeyConditionExpression=Key('email').eq(email)
         )
         items = response.get('Items', [])
         return items[0] if items else None
@@ -148,7 +136,7 @@ def create_user(app, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         
         # ユーザーデータの準備
         new_user = {
-            'user_id': generate_user_id(),
+            'user#user_id': generate_user_id(),
             'organization': user_data.get('organization', 'uguis'),  # デフォルトはuguis
             'email': user_data['email'],
             'password': generate_password_hash(user_data['password']),
@@ -162,7 +150,9 @@ def create_user(app, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             'phone': user_data.get('phone', ''),
             'administrator': user_data.get('administrator', False),
             'created_at': current_time,
-            'updated_at': current_time
+            'updated_at': current_time,
+            "guardian_name": user_data['guardian_name'],
+            "emergency_phone": user_data.get('emergency_phone', ''),
         }
         
         # ユーザーデータの保存
@@ -179,17 +169,19 @@ def create_user(app, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 def create_test_user(app):
     """テストユーザーを作成する"""
     test_data = {
-        'organization': 'てすとくん01',  # 明示的に所属を設定
-        'email': 'test01@test.com',
-        'password': '00000000',
-        'user_name': '山田　太郎',
+        'organization': '鶯',  # 明示的に所属を設定
+        'email': 'shibuyamasahiko@gmail.com',
+        'password': 'giko8020@Z',
+        'user_name': '渋谷　正彦',
         'display_name': '渋谷',
-        'furigana': 'ヤマダ　タロウ',
+        'furigana': 'シブヤ　マサヒコ',
         'gender': 'male',
-        'date_of_birth': date(1988, 11, 10),
+        'date_of_birth': date(1971, 11, 20),
         'post_code': '3430032',
         'address': '埼玉県越谷市袋山95-1',
-        'phone': '09000000000',
+        'phone': '07066330363',
+        'guardian_name': '渋谷　俊春',
+        'emergency_phone': '07066330000',
         'administrator': False
     }
     
@@ -210,5 +202,5 @@ if __name__ == "__main__":
     
     if user:
         print("\nテストユーザーが正常に作成されました")
-        print(f"ユーザーID: {user['user_id']}")
+        print(f"ユーザーID: {user['user#user_id']}")
         print(f"所属: {user['organization']}")
