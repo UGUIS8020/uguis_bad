@@ -22,6 +22,7 @@ import random
 from urllib.parse import urlparse, urljoin
 from dotenv import load_dotenv
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -214,9 +215,7 @@ class UpdateUserForm(FlaskForm):
             raise ValidationError('メールアドレスの確認中にエラーが発生しました。')
       
 
-from flask_login import UserMixin
-from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
+
 
 class User(UserMixin):
     def __init__(self, user_id, display_name, user_name, furigana, email, password_hash, 
@@ -855,39 +854,39 @@ def get_table_info():
     except Exception as e:
         return f'Error: {str(e)}'
     
-@app.route("/remove_user_id")
-def remove_user_id():
-    try:
-        table = get_schedule_table()
-        response = table.scan()
-        items = response['Items']
+# @app.route("/remove_user_id")
+# def remove_user_id():
+#     try:
+#         table = get_schedule_table()
+#         response = table.scan()
+#         items = response['Items']
         
-        success_count = 0
-        error_count = 0
+#         success_count = 0
+#         error_count = 0
         
-        for item in items:
-            try:
-                # 両方のキーを指定
-                table.update_item(
-                    Key={
-                        'venue_date': item['venue_date'],
-                        'schedule_id': item['schedule_id']
-                    },
-                    UpdateExpression='REMOVE user_id, #s',  # status も同時に削除
-                    ExpressionAttributeNames={
-                        '#s': 'status'
-                    }
-                )
-                success_count += 1
-                print(f"Processed: {item['venue_date']} - {item['schedule_id']}")
-            except Exception as e:
-                print(f"Error with item {item['schedule_id']}: {str(e)}")
-                error_count += 1
-                continue
+#         for item in items:
+#             try:
+#                 # 両方のキーを指定
+#                 table.update_item(
+#                     Key={
+#                         'venue_date': item['venue_date'],
+#                         'schedule_id': item['schedule_id']
+#                     },
+#                     UpdateExpression='REMOVE user_id, #s',  # status も同時に削除
+#                     ExpressionAttributeNames={
+#                         '#s': 'status'
+#                     }
+#                 )
+#                 success_count += 1
+#                 print(f"Processed: {item['venue_date']} - {item['schedule_id']}")
+#             except Exception as e:
+#                 print(f"Error with item {item['schedule_id']}: {str(e)}")
+#                 error_count += 1
+#                 continue
         
-        return f'Processed {success_count + error_count} items. Success: {success_count}, Errors: {error_count}'
-    except Exception as e:
-        return f'Error: {str(e)}'
+#         return f'Processed {success_count + error_count} items. Success: {success_count}, Errors: {error_count}'
+#     except Exception as e:
+#         return f'Error: {str(e)}'
     
 
 @app.route('/account/<string:user_id>', methods=['GET', 'POST'])
@@ -997,12 +996,7 @@ def delete_user(user_id):
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('データベースエラーが発生しました。', 'error')
         return redirect(url_for('user_maintenance'))
-
     
-@app.route("/uguis2024_tournament")
-def uguis2024_tournament():
-    return render_template("uguis2024_tournament.html")
-
 
 @app.route("/gallery", methods=["GET", "POST"])
 def gallery():
@@ -1085,6 +1079,9 @@ def delete_image(filename):
         print(f"Error deleting {filename}: {e}")
         return "Error deleting the image", 500
     
+@app.route("/uguis2024_tournament")
+def uguis2024_tournament():
+    return render_template("uguis2024_tournament.html")
 
 @app.route("/videos")
 def video_link():
