@@ -110,8 +110,6 @@ def load_user(user_id):
                 "user#user_id": {"S": user_id}  
             }
         )
-        
-
 
         app.logger.debug(f"DynamoDB response: {response}")
 
@@ -227,7 +225,7 @@ class User(UserMixin):
                  organization='uguis', administrator=False, 
                  created_at=None, updated_at=None):
         super().__init__()
-        self.user_id = user_id if user_id.startswith('user#') else f'user#{user_id}'
+        self.user_id = user_id
         self.display_name = display_name
         self.user_name = user_name
         self.furigana = furigana

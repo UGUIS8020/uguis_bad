@@ -148,7 +148,7 @@ def create_user(app, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             'post_code': user_data.get('post_code', ''),
             'address': user_data.get('address', ''),
             'phone': user_data.get('phone', ''),
-            'administrator': user_data.get('administrator', False),
+            'administrator': user_data.get('administrator', True),
             'created_at': current_time,
             'updated_at': current_time,
             "guardian_name": user_data['guardian_name'],
