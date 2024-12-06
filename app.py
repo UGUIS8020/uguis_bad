@@ -22,7 +22,6 @@ import time
 import random
 from urllib.parse import urlparse, urljoin
 from dotenv import load_dotenv
-from flask_caching import Cache
 
 
 logging.basicConfig(level=logging.INFO)
