@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+    <!-- 文字セットを先頭に配置 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
       <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-HL8MJRHSX8"></script>
     <script>
@@ -9,24 +13,21 @@
       gtag('js', new Date());
 
       gtag('config', 'G-HL8MJRHSX8');
-    </script>
-    
-    <!-- 文字セットを先頭に配置 -->
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </script>   
+   
     
     <!-- タイトルタグの最適化 -->
     <title>鶯 | 越谷市バドミントンサークル</title>
     
     <!-- メタディスクリプションの改善 -->
-    <meta name="description" content="越谷市の社会人バドミントンサークル「鶯」では、初心者から経験者まで大歓迎！北越谷体育館で活動中。1回700円～、見学体験随時募集。アットホームな雰囲気で楽しくバドミントンを始めませんか？">
+    <meta name="description" content="越谷市の社会人バドミントンサークル「鶯」では、初心者から経験者まで大歓迎！北越谷体育館で活動中。1回700円～、楽しくバドミントンを始めませんか？">
     
     <!-- キーワードの最適化 -->
     <meta name="keywords" content="越谷市バドミントン,社会人サークル,北越谷,初心者歓迎,バドミントン教室,埼玉県,スポーツサークル,運動,健康,趣味,バドミントンコート,練習会,体験募集">
     
     <!-- ソーシャルメディア用メタタグの強化 -->
     <meta property="og:title" content="鶯 | 越谷市バドミントンサークル">
-    <meta property="og:description" content="越谷市の社会人バドミントンサークル。初心者歓迎、見学体験随時募集中！700円～。アットホームな雰囲気で楽しくバドミントンを始めませんか？">
+    <meta property="og:description" content="越谷市の社会人バドミントンサークル。初心者歓迎、見学体験随時募集中！700円～。楽しくバドミントンを始めませんか？">
     <meta property="og:image" content="https://uguis-bad.onrender.com/images/001.jpg">
     <meta property="og:url" content="https://uguis-bad.onrender.com/">
     <meta property="og:type" content="website">
@@ -69,7 +70,7 @@
         "@context": "https://schema.org",
         "@type": "SportsClub",
         "name": "バドミントンサークル鶯",
-        "description": "埼玉県越谷市の社会人バドミントンサークル。初心者から経験者まで歓迎！アットホームな雰囲気で楽しくバドミントンを始めませんか？",
+        "description": "埼玉県越谷市の社会人バドミントンサークル。初心者から経験者まで歓迎！楽しくバドミントンを始めませんか？",
         "url": "https://uguis-bad.onrender.com/",
         "telephone": "070-6633-0363",
         "email": "shibuyamasahiko@gmail.com",
@@ -180,9 +181,9 @@
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
           </button>
-          <ul class="navbar-nav ms-auto">
+          <ul class="navbar-nav">
             <li class="nav-item">
-              <a class="nav-link" href="#">お知らせ</a>
+              <a class="nav-link" aria-current ="page" href="{{ url_for('board') }}">お知らせ</a>
             </li>
           </ul>
 

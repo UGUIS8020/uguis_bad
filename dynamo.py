@@ -15,7 +15,7 @@ dynamodb = boto3.client(
 )
 
 # テーブル名を環境変数から取得
-table_name = os.getenv("TABLE_NAME")
+table_name = os.getenv("TABLE_NAME_USER")
 
 with app.app_context():
     # すべてのテーブルをドロップ

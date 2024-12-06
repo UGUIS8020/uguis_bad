@@ -12,7 +12,7 @@ def init_tables():
         region_name=os.getenv("AWS_REGION")
     )
 
-    table_name = os.getenv("TABLE_NAME")
+    table_name = os.getenv("TABLE_NAME_USER")
     
     try:
         # メインのユーザーテーブルを作成
