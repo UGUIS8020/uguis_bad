@@ -16,7 +16,6 @@ import io
 from PIL import Image, ExifTags
 from dateutil.relativedelta import relativedelta
 from botocore.exceptions import ClientError
-from init_db import init_tables  # init_counter_tableから変更
 import logging
 import time
 import random
@@ -405,226 +404,6 @@ class Board_Form(FlaskForm):
     FileAllowed(['jpg', 'png', 'gif', 'pdf'], 'jpg, png, gif, pdfのみアップロード可能です。')])
     submit = SubmitField('投稿する')
 
-
-def get_board_table():
-    dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
-    return dynamodb.Table('bad-board-table')
-
-# @app.route('/board', methods=['GET', 'POST'])
-# def board():
-#     print("Board route accessed")  # デバッグ用
-#     form = Board_Form()
-#     board_table = get_board_table('bad-users')
-    
-#     try:
-#         response = board_table.scan()  # resourceインターフェースを使用
-#         posts = response.get('Items', [])
-#         # 受け取ったデータの構造を確認するためのデバッグ出力
-#         print("Raw posts data:", posts)  
-        
-#         # 必要なフィールドが存在することを確認
-#         formatted_posts = []
-#         for post in posts:
-#             formatted_post = {
-#                 'user#user_id': post.get('user#user_id', ''),
-#                 'post#post_id': post.get('post#post_id', ''),
-#                 'title': post.get('title', ''),
-#                 'content': post.get('content', ''),
-#                 'created_at': post.get('created_at', ''),
-#                 'display_name': post.get('display_name', '未知のユーザー'),
-#                 'image_url': post.get('image_url', '')
-#             }
-#             formatted_posts.append(formatted_post)
-        
-#         # 日時でソート
-#         formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
-#         print(f"Retrieved and formatted {len(formatted_posts)} posts")
-#         posts = formatted_posts  # 整形したデータで上書き
-
-#     except Exception as e:
-#         posts = []
-#         print(f"Error retrieving posts: {str(e)}")
-#         flash(f"データの取得に失敗しました: {str(e)}", "danger")
-
-#     if form.validate_on_submit():
-#         print("Form validated successfully")  # デバッグ用
-#         try:
-#             image_url = None
-#             if form.image.data:
-#                 print("Image data detected")  # デバッグ用
-#                 image_file = form.image.data
-#                 print(f"File info: {image_file.filename}, {image_file.content_type}")  # デバッグ用
-
-#                 if not image_file.filename:
-#                     print("No filename")  # デバッグ用
-#                     flash("ファイル名が無効です", "danger")
-#                     return redirect(url_for('board'))
-
-#                 filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
-#                 print(f"Generated filename: {filename}")  # デバッグ用
-
-#                 try:
-#                     s3_path = f"board/{filename}"
-#                     print(f"Attempting S3 upload to path: {s3_path}")  # デバッグ用
-
-#                     # ファイルポインタをリセット
-#                     image_file.stream.seek(0)
-
-#                     # S3バケット名の確認
-#                     print(f"S3 bucket name: {app.config['S3_BUCKET']}")  # デバッグ用
-
-#                     app.s3.upload_fileobj(
-#                         image_file.stream,
-#                         app.config['S3_BUCKET'],
-#                         s3_path,
-#                         ExtraArgs={
-#                             'ContentType': image_file.content_type,                            
-#                         }
-#                     )
-#                     print("S3 upload successful")  # デバッグ用
-#                     image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
-#                     print(f"Generated image URL: {image_url}")  # デバッグ用
-#                 except Exception as e:
-#                     print(f"S3 upload error: {type(e).__name__} - {str(e)}")  # デバッグ用
-#                     flash(f"画像のアップロードに失敗しました: {type(e).__name__} - {str(e)}", "danger")
-#                     return redirect(url_for('board'))
-
-#             new_post = {
-#                 'post_id': str(uuid.uuid4()),
-#                 'title': form.title.data,
-#                 'content': form.content.data,
-#                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-#                 'image_url': image_url if image_url else ''
-#             }
-
-#             print("Attempting to save to DynamoDB")
-#             new_post = {
-#                     'user#user_id': current_user.user_id,
-#                     'post#post_id': str(uuid.uuid4()),
-#                     'title': new_post['title'],
-#                     'content': new_post['content'],
-#                     'created_at': new_post['created_at'],
-#                     'image_url': new_post['image_url']
-#                 }
-            
-#             print("Attempting to save to DynamoDB")  # デバッグ用
-#             board_table.put_item(Item=new_post)            
-#             print("DynamoDB save successful")  # デバッグ用
-            
-#             flash('投稿が成功しました！', 'success')
-#             return redirect(url_for('board'))
-            
-#         except Exception as e:
-#             print(f"Post creation error: {str(e)}")  # デバッグ用
-#             flash(f"投稿に失敗しました: {str(e)}", "danger")
-
-#     return render_template('board.html', form=form, posts=posts)
-
-@app.route('/board', methods=['GET', 'POST'])
-
-def board():
-    form = Board_Form()
-    board_table = get_board_table()      
-    
-    try:
-        response = board_table.scan()
-        posts = response.get('Items', [])
-        print("Raw posts data:", posts)  # デバッグ用         
-           
-
-        formatted_posts = []
-        for post in posts:
-            formatted_post = {
-                'user#user_id': post.get('user#user_id', ''),
-                'post#post_id': post.get('post#post_id', ''),
-                'title': post.get('title', ''),
-                'content': post.get('content', ''),
-                'created_at': post.get('created_at', ''),                
-                'image_url': post.get('image_url', ''),
-                'author_name': post.get('author_name', '名前未設定'),
-            }
-            formatted_posts.append(formatted_post)
-        
-        # 日時でソート
-        formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
-        print(f"Retrieved and formatted {len(formatted_posts)} posts")
-        posts = formatted_posts  # 整形したデータで上書き
-
-    except Exception as e:
-        posts = []
-        print(f"Error retrieving posts: {str(e)}")
-        flash(f"データの取得に失敗しました: {str(e)}", "danger")
-
-    if form.validate_on_submit():
-        print("Form validated successfully")  # デバッグ用
-        try:
-            image_url = None
-            if form.image.data:
-                print("Image data detected")  # デバッグ用
-                image_file = form.image.data
-                print(f"File info: {image_file.filename}, {image_file.content_type}")  # デバッグ用
-
-                if not image_file.filename:
-                    print("No filename")  # デバッグ用
-                    flash("ファイル名が無効です", "danger")
-                    return redirect(url_for('board'))
-
-                filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
-                print(f"Generated filename: {filename}")  # デバッグ用
-
-                try:
-                    s3_path = f"board/{filename}"
-                    print(f"Attempting S3 upload to path: {s3_path}")  # デバッグ用
-
-                    # ファイルポインタをリセット
-                    image_file.stream.seek(0)
-
-                    # S3バケット名の確認
-                    print(f"S3 bucket name: {app.config['S3_BUCKET']}")  # デバッグ用
-
-                    app.s3.upload_fileobj(
-                        image_file.stream,
-                        app.config['S3_BUCKET'],
-                        s3_path,
-                        ExtraArgs={
-                            'ContentType': image_file.content_type,                            
-                        }
-                    )
-                    print("S3 upload successful")  # デバッグ用
-                    image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
-                    print(f"Generated image URL: {image_url}")  # デバッグ用
-                except Exception as e:
-                    print(f"S3 upload error: {type(e).__name__} - {str(e)}")  # デバッグ用
-                    flash(f"画像のアップロードに失敗しました: {type(e).__name__} - {str(e)}", "danger")
-                    return redirect(url_for('board'))
-
-            print("Attempting to save to DynamoDB")
-            new_post = {
-                'user#user_id': current_user.user_id,
-                'post#post_id': str(uuid.uuid4()),
-                'title': form.title.data,
-                'content': form.content.data,
-                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'author_name': current_user.display_name,
-                'image_url': image_url if image_url else ''
-            }
-            
-            print("Attempting to save to DynamoDB")  # デバッグ用
-            board_table.put_item(Item=new_post)            
-            print("DynamoDB save successful")  # デバッグ用
-            
-            flash('投稿が成功しました！', 'success')
-            return redirect(url_for('board'))
-            
-        except Exception as e:
-            print(f"Post creation error: {str(e)}")  # デバッグ用
-            flash(f"投稿に失敗しました: {str(e)}", "danger")
-
-    return render_template('board.html', form=form, posts=posts)
-
-
-
-
 def get_schedule_table():
     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
     return dynamodb.Table('Schedule')
@@ -655,15 +434,14 @@ def index():
             return redirect(url_for('index'))
 
         except Exception as e:
-            app.logger.error(f"スケジュール登録エラー: {str(e)}")
+           
             flash('スケジュールの登録中にエラーが発生しました', 'error')
 
     # スケジュール一覧の取得とソート
     try:
         schedules = get_schedules_with_formatting()
         schedules = sorted(schedules, key=lambda x: (x['date'], x['start_time']))
-    except Exception as e:
-        app.logger.error(f"スケジュール取得エラー: {str(e)}")
+    except Exception as e:        
         schedules = []    
 
     return render_template(
@@ -791,12 +569,8 @@ def signup():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
 
-    print("あ")
-
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
-    
-    print("い")
+        return redirect(url_for('index')) 
 
     # form = LoginForm(dynamodb_table=app.table)
     form = LoginForm()
@@ -1114,7 +888,7 @@ def account(user_id):
             form.gender.data = user['gender']['S']
             form.date_of_birth.data = datetime.strptime(user['date_of_birth']['S'], '%Y-%m-%d')            
             form.organization.data = user['organization']['S']
-# 　　　　　　　任意のフィールド
+             #任意のフィールド
             form.guardian_name.data = user.get('guardian_name', {}).get('S', '')            
             form.emergency_phone.data = user.get('emergency_phone', {}).get('S', '')
             
@@ -1268,21 +1042,171 @@ def delete_image(filename):
         print(f"Error deleting {filename}: {e}")
         return "Error deleting the image", 500
     
+
+def get_board_table():
+    dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
+    return dynamodb.Table('bad-board-table')
+
+
+@app.route('/board', methods=['GET', 'POST'])
+
+def board():
+    form = Board_Form()
+    board_table = get_board_table()      
+    
+    try:
+        response = board_table.scan()
+        posts = response.get('Items', [])            
+           
+
+        formatted_posts = []
+        for post in posts:
+            formatted_post = {
+                'user#user_id': post.get('user#user_id', ''),
+                'post#post_id': post.get('post#post_id', ''),
+                'title': post.get('title', ''),
+                'content': post.get('content', ''),
+                'created_at': post.get('created_at', ''),                
+                'image_url': post.get('image_url', ''),
+                'author_name': post.get('author_name', '名前未設定'),
+            }
+            formatted_posts.append(formatted_post)
+        
+        # 日時でソート
+        formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
+        print(f"Retrieved and formatted {len(formatted_posts)} posts")
+        posts = formatted_posts  # 整形したデータで上書き
+
+    except Exception as e:
+        posts = []
+        print(f"Error retrieving posts: {str(e)}")
+        flash(f"データの取得に失敗しました: {str(e)}", "danger")
+
+    if form.validate_on_submit():
+        print("Form validated successfully")  # デバッグ用
+        try:
+            image_url = None
+            if form.image.data:
+                print("Image data detected")  # デバッグ用
+                image_file = form.image.data
+                print(f"File info: {image_file.filename}, {image_file.content_type}")  # デバッグ用
+
+                if not image_file.filename:
+                    print("No filename")  # デバッグ用
+                    flash("ファイル名が無効です", "danger")
+                    return redirect(url_for('board'))
+
+                filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")               
+
+                try:
+                    s3_path = f"board/{filename}"                    
+
+                    # ファイルポインタをリセット
+                    image_file.stream.seek(0)                    
+
+                    app.s3.upload_fileobj(
+                        image_file.stream,
+                        app.config['S3_BUCKET'],
+                        s3_path,
+                        ExtraArgs={
+                            'ContentType': image_file.content_type,                            
+                        }
+                    )                    
+                    image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"                    
+                except Exception as e:                    
+                    flash(f"画像のアップロードに失敗しました: {type(e).__name__} - {str(e)}", "danger")
+                    return redirect(url_for('board'))
+
+            print("Attempting to save to DynamoDB")
+            new_post = {
+                'user#user_id': current_user.user_id,
+                'post#post_id': str(uuid.uuid4()),
+                'title': form.title.data,
+                'content': form.content.data,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'author_name': current_user.display_name,
+                'image_url': image_url if image_url else ''}            
+            
+            board_table.put_item(Item=new_post)   
+            
+            
+            flash('投稿が成功しました！', 'success')
+            return redirect(url_for('board'))
+            
+        except Exception as e:            
+            flash(f"投稿に失敗しました: {str(e)}", "danger")
+
+    return render_template('board.html', form=form, posts=posts)
+
+
+@app.route('/board/delete/<string:post_id>', methods=['POST'])
+def delete_post(post_id):
+    board_table = get_board_table()
+
+    try:
+        # 投稿を削除
+        board_table.delete_item(Key={'post#post_id': post_id})
+        flash("投稿が削除されました", "success")
+    except Exception as e:
+        flash(f"投稿の削除に失敗しました: {str(e)}", "danger")
+
+    return redirect(url_for('board'))
+
+
+@app.route('/board/edit/<string:post_id>', methods=['GET', 'POST'])
+def edit_post(post_id):
+    form = Board_Form()
+    board_table = get_board_table()
+
+    try:
+        # 投稿を取得
+        response = board_table.get_item(Key={'post#post_id': post_id})
+        post = response.get('Item')
+
+        if not post:
+            flash("投稿が見つかりません", "danger")
+            return redirect(url_for('board'))
+
+        if request.method == 'POST' and form.validate_on_submit():
+            # 更新するフィールドを準備
+            updated_post = {
+                'title': form.title.data,
+                'content': form.content.data,
+                'author_name': current_user.display_name,
+            }
+
+            # 投稿を更新
+            board_table.update_item(
+                Key={'post#post_id': post_id},
+                UpdateExpression="SET title = :title, content = :content, author_name = :author_name",
+                ExpressionAttributeValues={
+                    ':title': updated_post['title'],
+                    ':content': updated_post['content'],
+                    ':author_name': updated_post['author_name'],
+                }
+            )
+
+            flash("投稿が更新されました", "success")
+            return redirect(url_for('board'))
+
+        # フォームに既存の投稿データをセット
+        form.title.data = post.get('title')
+        form.content.data = post.get('content')
+
+    except Exception as e:
+        flash(f"投稿の編集に失敗しました: {str(e)}", "danger")
+        return redirect(url_for('board'))
+
+    return render_template('edit_post.html', form=form, post=post)
+    
+    
 @app.route("/uguis2024_tournament")
 def uguis2024_tournament():
     return render_template("uguis2024_tournament.html")
 
 @app.route("/videos")
 def video_link():
-    return render_template("video_link.html")    
-
-@app.route("/<int:id>/delete")
-# @login_required
-def delete(id):
-    post = Post.query.get(id)
-    db.session.delete(post)
-    db.session.commit()
-    return redirect("/")  
+    return render_template("video_link.html")  
 
 
 if __name__ == "__main__":
