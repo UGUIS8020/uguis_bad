@@ -379,6 +379,7 @@ class ScheduleForm(FlaskForm):
         ('', '選択してください'),
         ('北越谷 A面', '北越谷 A面'),
         ('北越谷 B面', '北越谷 B面'),
+        ('北越谷 AB面', '北越谷 AB面'),
         ('越谷総合体育館 第1体育室', '越谷総合体育館 第1体育室'),
         ('越谷総合体育館 第1体育室 6面', '越谷総合体育館 第1体育室 6面'),
         ('ウィングハット', 'ウィングハット')
@@ -1257,7 +1258,7 @@ def gallery():
 def delete_image(filename):
     try:
         # S3から指定されたファイルを削除
-        app.s3.delete_object(Bucket=app.config["S3_BUCKET"], Key=filename)
+        app.s3.delete_object(Bucket=app.config["S3_BUCKET"], Key=f"gallery/{filename}")
         print(f"Deleted {filename} from S3")
 
         # 削除成功後にアップロードページにリダイレクト
