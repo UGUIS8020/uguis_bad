@@ -664,9 +664,16 @@ def index():
         schedules = sorted(schedules, key=lambda x: (x['date'], x['start_time']))
     except Exception as e:
         app.logger.error(f"スケジュール取得エラー: {str(e)}")
-        schedules = []
+        schedules = []    
 
-    return render_template("index.html", form=form, schedules=schedules)
+    return render_template(
+    "index.html",
+    form=form,
+    schedules=schedules,
+    title="鶯 | 越谷市バドミントンサークル",
+    description="初心者から経験者まで楽しめる越谷市のバドミントンサークル「鶯」です。",
+    canonical=url_for('index', _external=True)
+    )
 
 
 def get_schedules_with_formatting():
