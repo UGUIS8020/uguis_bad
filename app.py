@@ -1118,6 +1118,7 @@ def board():
                 'title': post.get('title', ''),
                 'content': post.get('content', ''),
                 'created_at': post.get('created_at', ''),
+                'updated_at': post.get('updated_at', ''),  # 追加
                 'image_url': image_url,
                 'author_name': post.get('author_name', '名前未設定'),
                 'admin_memo': post.get('admin_memo', '')  # 管理者用メモを追加
@@ -1125,8 +1126,13 @@ def board():
             print(f"Formatted post: {formatted_post}")
             formatted_posts.append(formatted_post)
 
-        formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
-        print(f"Retrieved and formatted {len(formatted_posts)} posts")
+        # formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
+        # print(f"Retrieved and formatted {len(formatted_posts)} posts")
+
+        formatted_posts.sort(
+        key=lambda x: datetime.strptime(x['updated_at'], '%Y-%m-%d %H:%M:%S') if x.get('updated_at') else datetime.strptime(x['created_at'], '%Y-%m-%d %H:%M:%S'),
+        reverse=True
+)
 
     except Exception as e:
         formatted_posts = []
@@ -1173,6 +1179,7 @@ def board():
                 'title': form.title.data,
                 'content': form.content.data,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 追加
                 'author_name': current_user.display_name,
                 'image_url': image_url  # 空文字列かURLのいずれかが設定される
             }

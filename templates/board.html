@@ -68,7 +68,10 @@
                                 <span class="text-muted">({{ post.organization }})</span>
                             {% endif %}
                         </div>
-                        <small class="text-muted">{{ post.created_at }}</small>
+                        <small class="text-muted">
+                            投稿日時: {{ post.created_at }}<br>
+                            最終更新: {{ post.updated_at }}
+                        </small>
                     </div>
                 </div>
                 <div class="card-body">
