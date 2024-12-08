@@ -1194,6 +1194,46 @@ def board():
     return render_template('board.html', form=form, posts=formatted_posts)
 
 
+@app.route('/post/<string:post_id>/update-memo', methods=['POST'])
+@login_required
+def update_admin_memo(post_id):
+    if not current_user.is_admin:
+        flash('権限がありません', 'danger')
+        return redirect(url_for('index'))
+
+    try:
+        admin_memo = request.form.get('admin_memo')
+        board_table = get_board_table()
+        
+        # 投稿を取得して更新
+        response = board_table.get_item(
+            Key={
+                'user#user_id': current_user.user_id,
+                'post#post_id': post_id
+            }
+        )
+        if 'Item' in response:
+            board_table.update_item(
+                Key={
+                    'user#user_id': current_user.user_id,
+                    'post#post_id': post_id
+                },
+                UpdateExpression="SET admin_memo = :memo",
+                ExpressionAttributeValues={
+                    ':memo': admin_memo
+                }
+            )
+            flash('メモを更新しました', 'success')
+        else:
+            flash('投稿が見つかりません', 'danger')
+    
+    except Exception as e:
+        flash('メモの更新に失敗しました', 'danger')
+        print(f"Error updating memo: {str(e)}")
+
+    return redirect(url_for('index'))
+
+
 
 @app.route('/board/delete/<string:post_id>', methods=['POST'])
 @login_required
