@@ -5,7 +5,7 @@ from flask_login import UserMixin, LoginManager, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from wtforms import ValidationError, StringField,  TextAreaField, PasswordField, SubmitField, SelectField, DateField, BooleanField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional
-from flask_wtf.file import FileField, FileAllowed
+from flask_wtf.file import FileField, FileAllowed, FileSize
 import pytz
 import os
 import boto3
@@ -113,9 +113,7 @@ def load_user(user_id):
             Key={
                 "user#user_id": user_id  # パーティションキーをそのまま指定
             }
-        )
-
-        app.logger.debug(f"DynamoDB response: {response}")
+        )        
 
         if 'Item' in response:
             user_data = response['Item']
@@ -397,12 +395,45 @@ class ScheduleForm(FlaskForm):
     submit = SubmitField('登録')
 
 
+# class Board_Form(FlaskForm):
+#     title = StringField('タイトル', validators=[DataRequired()])
+#     content = TextAreaField('内容', validators=[DataRequired()])
+#     image = FileField('ファイル', validators=[
+#     FileAllowed(['jpg', 'png', 'gif', 'pdf'], 'jpg, png, gif, pdfのみアップロード可能です。')])
+#     remove_image = BooleanField('画像を削除する')  # チェックボックスで画像削除を選択可能に
+#     submit = SubmitField('投稿する')
+
 class Board_Form(FlaskForm):
-    title = StringField('タイトル', validators=[DataRequired()])
-    content = TextAreaField('内容', validators=[DataRequired()])
-    image = FileField('ファイル', validators=[
-    FileAllowed(['jpg', 'png', 'gif', 'pdf'], 'jpg, png, gif, pdfのみアップロード可能です。')])
+    title = StringField('タイトル', 
+        validators=[
+            DataRequired(message='タイトルを入力してください'),
+            Length(max=100, message='タイトルは100文字以内で入力してください')
+        ])
+    
+    content = TextAreaField('内容', 
+        validators=[
+            DataRequired(message='内容を入力してください'),
+            Length(max=2000, message='内容は2000文字以内で入力してください')
+        ])
+    
+    image = FileField('ファイル', 
+        validators=[
+            FileAllowed(
+                ['jpg', 'jpeg', 'png', 'gif', 'pdf'],
+                'jpg, jpeg, png, gif, pdfファイルのみアップロード可能です'
+            ),
+            FileSize(max_size=5 * 1024 * 1024, message='ファイルサイズは5MB以内にしてください')  # 5MB制限
+        ])
+    
+    remove_image = BooleanField('画像を削除する')
+    
     submit = SubmitField('投稿する')
+
+    def validate_image(self, field):
+        if field.data:
+            filename = field.data.filename.lower()
+            if not any(filename.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.pdf']):
+                raise ValidationError('許可されていないファイル形式です')
 
 def get_schedule_table():
     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
@@ -665,7 +696,7 @@ def is_safe_url(target):
 # @login_required
 def logout():
     logout_user()
-    return redirect("/login")
+    return redirect("/")
 
 def get_schedule_table():
     # デバッグログを追加
@@ -846,10 +877,10 @@ def get_table_info():
 @app.route('/account/<string:user_id>', methods=['GET', 'POST'])
 def account(user_id):
     try:
-        response = app.dynamodb.get_item(
-            TableName=app.table_name,
+        table = app.dynamodb.Table(app.table_name)  # Table オブジェクトを取得
+        response = table.get_item(
             Key={
-                'user#user_id': {'S': user_id}                
+                'user#user_id': user_id
             }
         )
         user = response.get('Item')
@@ -858,7 +889,7 @@ def account(user_id):
         if not user:
             abort(404)
 
-        user['user_id'] = user.pop('user#user_id')['S']
+        user['user_id'] = user.pop('user#user_id')
         app.logger.debug(f"Processed user data: {user}")
             
         # 現在のユーザーが対象ユーザーまたは管理者であることを確認
@@ -874,23 +905,23 @@ def account(user_id):
         if request.method == 'GET':
               # 任意フィールドは存在チェックを行う
             if 'guardian_name' in user:
-                form.guardian_name.data = user['guardian_name']['S']
+                form.guardian_name.data = user['guardian_name']
             if 'emergency_phone' in user:
-                form.emergency_phone.data = user['emergency_phone']['S']
+                form.emergency_phone.data = user['emergency_phone']
             # GETリクエスト時はフォームに値を設定するだけ
-            form.display_name.data = user['display_name']['S']
-            form.user_name.data = user['user_name']['S']
-            form.furigana.data = user['furigana']['S']
-            form.email.data = user['email']['S']
-            form.phone.data = user['phone']['S']
-            form.post_code.data = user['post_code']['S']
-            form.address.data = user['address']['S']
-            form.gender.data = user['gender']['S']
-            form.date_of_birth.data = datetime.strptime(user['date_of_birth']['S'], '%Y-%m-%d')            
-            form.organization.data = user['organization']['S']
+            form.display_name.data = user['display_name']
+            form.user_name.data = user['user_name']
+            form.furigana.data = user['furigana']
+            form.email.data = user['email']
+            form.phone.data = user['phone']
+            form.post_code.data = user['post_code']
+            form.address.data = user['address']
+            form.gender.data = user['gender']
+            form.date_of_birth.data = datetime.strptime(user['date_of_birth'], '%Y-%m-%d')            
+            form.organization.data = user['organization']
              #任意のフィールド
-            form.guardian_name.data = user.get('guardian_name', {}).get('S', '')            
-            form.emergency_phone.data = user.get('emergency_phone', {}).get('S', '')
+            form.guardian_name.data = user.get('guardian_name', '')           
+            form.emergency_phone.data = user.get('emergency_phone', '')
             
         elif form.validate_on_submit():  # POSTリクエストの処理
             current_time = datetime.now().isoformat()
@@ -1056,68 +1087,72 @@ def board():
     
     try:
         response = board_table.scan()
-        posts = response.get('Items', [])            
-           
+        posts = response.get('Items', [])
+        print(f"Raw posts from DynamoDB: {posts}")
 
         formatted_posts = []
         for post in posts:
+            print(f"Raw post data: {post}")
+
+            # image_urlのキーの存在確認と、空文字列やNoneの場合の処理
+            image_url = post.get('image_url')
+            if image_url is None or image_url == '':
+                image_url = ''  # デフォルト値を設定
+
             formatted_post = {
                 'user#user_id': post.get('user#user_id', ''),
                 'post#post_id': post.get('post#post_id', ''),
                 'title': post.get('title', ''),
                 'content': post.get('content', ''),
-                'created_at': post.get('created_at', ''),                
-                'image_url': post.get('image_url', ''),
+                'created_at': post.get('created_at', ''),
+                'image_url': image_url,
                 'author_name': post.get('author_name', '名前未設定'),
             }
+            print(f"Formatted post: {formatted_post}")
             formatted_posts.append(formatted_post)
-        
-        # 日時でソート
+
         formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
         print(f"Retrieved and formatted {len(formatted_posts)} posts")
-        posts = formatted_posts  # 整形したデータで上書き
 
     except Exception as e:
-        posts = []
+        formatted_posts = []
         print(f"Error retrieving posts: {str(e)}")
         flash(f"データの取得に失敗しました: {str(e)}", "danger")
 
     if form.validate_on_submit():
-        print("Form validated successfully")  # デバッグ用
+        print("Form validated successfully")
         try:
-            image_url = None
+            image_url = ''  # デフォルト値を空文字列に設定
             if form.image.data:
-                print("Image data detected")  # デバッグ用
+                print(f"Image data detected: {form.image.data}")
                 image_file = form.image.data
-                print(f"File info: {image_file.filename}, {image_file.content_type}")  # デバッグ用
 
                 if not image_file.filename:
-                    print("No filename")  # デバッグ用
+                    print("No filename provided")
                     flash("ファイル名が無効です", "danger")
                     return redirect(url_for('board'))
 
-                filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")               
+                filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
+                s3_path = f"board/{filename}"
+                print(f"Generated S3 path: {s3_path}")               
 
                 try:
-                    s3_path = f"board/{filename}"                    
-
-                    # ファイルポインタをリセット
-                    image_file.stream.seek(0)                    
-
+                    image_file.stream.seek(0)
                     app.s3.upload_fileobj(
                         image_file.stream,
                         app.config['S3_BUCKET'],
                         s3_path,
-                        ExtraArgs={
-                            'ContentType': image_file.content_type,                            
-                        }
-                    )                    
-                    image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"                    
-                except Exception as e:                    
-                    flash(f"画像のアップロードに失敗しました: {type(e).__name__} - {str(e)}", "danger")
+                        ExtraArgs={'ContentType': image_file.content_type}
+                    )
+                    # S3のURLを確実に生成
+                    image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
+                    print(f"Generated image URL: {image_url}")  # URLが生成されたことを確認
+                except Exception as e:
+                    print(f"S3 upload failed: {str(e)}")
+                    flash(f"画像のアップロードに失敗しました: {str(e)}", "danger")
                     return redirect(url_for('board'))
 
-            print("Attempting to save to DynamoDB")
+            print("Preparing data for DynamoDB")
             new_post = {
                 'user#user_id': current_user.user_id,
                 'post#post_id': str(uuid.uuid4()),
@@ -1125,29 +1160,99 @@ def board():
                 'content': form.content.data,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'author_name': current_user.display_name,
-                'image_url': image_url if image_url else ''}            
-            
-            board_table.put_item(Item=new_post)   
-            
-            
+                'image_url': image_url  # 空文字列かURLのいずれかが設定される
+            }
+            print(f"New post data to save: {new_post}")           
+                
+            try:
+                board_table.put_item(Item=new_post)
+                print(f"Post saved to DynamoDB with image_url: {image_url}")
+            except Exception as e:
+                print(f"Error saving post to DynamoDB: {str(e)}")
+                flash(f"データの保存に失敗しました: {str(e)}", "danger")
+                return redirect(url_for('board'))
+
             flash('投稿が成功しました！', 'success')
             return redirect(url_for('board'))
-            
-        except Exception as e:            
-            flash(f"投稿に失敗しました: {str(e)}", "danger")
 
-    return render_template('board.html', form=form, posts=posts)
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            flash(f"予期しないエラーが発生しました: {str(e)}", "danger")
+            return redirect(url_for('board'))
+        
+    return render_template('board.html', form=form, posts=formatted_posts)
 
+
+# @app.route('/board/delete/<string:post_id>', methods=['POST'])
+# def delete_post(post_id):
+#     board_table = get_board_table()
+
+#     try:
+#         print(f"Deleting post with keys: user#user_id={current_user.user_id}, post#post_id={post_id}")
+        
+#         board_table.delete_item(Key={
+#             'user#user_id': current_user.user_id,
+#             'post#post_id': post_id
+#         })
+        
+#         flash("投稿が削除されました", "success")
+#     except Exception as e:
+#         print(f"Error deleting post: {str(e)}")
+#         flash(f"投稿の削除に失敗しました: {str(e)}", "danger")
+
+#     return redirect(url_for('board'))
 
 @app.route('/board/delete/<string:post_id>', methods=['POST'])
+@login_required
 def delete_post(post_id):
     board_table = get_board_table()
 
     try:
-        # 投稿を削除
-        board_table.delete_item(Key={'post#post_id': post_id})
+        # 最初に投稿データを取得して画像URLを確認
+        response = board_table.get_item(
+            Key={
+                'user#user_id': current_user.user_id,
+                'post#post_id': post_id
+            }
+        )
+        
+        if 'Item' not in response:
+            flash("投稿が見つかりませんでした", "danger")
+            return redirect(url_for('board'))
+            
+        post = response['Item']
+        image_url = post.get('image_url')
+        
+        # S3から画像を削除（画像URLが存在する場合）
+        if image_url and image_url.strip():
+            try:
+                # S3のパスを抽出 (https://bucket-name.s3.amazonaws.com/path/to/file から path/to/file を取得)
+                s3_path = image_url.split('.com/')[-1]
+                print(f"Attempting to delete S3 object: {s3_path}")
+                
+                app.s3.delete_object(
+                    Bucket=app.config['S3_BUCKET'],
+                    Key=s3_path
+                )
+                print(f"Successfully deleted S3 object: {s3_path}")
+            except Exception as e:
+                print(f"Error deleting S3 object: {str(e)}")
+                # S3削除のエラーはユーザーに通知するが、処理は続行
+                flash(f"画像の削除中にエラーが発生しました: {str(e)}", "warning")
+        
+        # DynamoDBから投稿を削除
+        board_table.delete_item(
+            Key={
+                'user#user_id': current_user.user_id,
+                'post#post_id': post_id
+            }
+        )
+        
+        print(f"Successfully deleted post and associated image")
         flash("投稿が削除されました", "success")
+        
     except Exception as e:
+        print(f"Error in delete_post: {str(e)}")
         flash(f"投稿の削除に失敗しました: {str(e)}", "danger")
 
     return redirect(url_for('board'))
@@ -1160,38 +1265,83 @@ def edit_post(post_id):
 
     try:
         # 投稿を取得
-        response = board_table.get_item(Key={'post#post_id': post_id})
+        response = board_table.get_item(Key={
+            'user#user_id': current_user.user_id,  # Partition Key
+            'post#post_id': post_id               # Sort Key
+        })
         post = response.get('Item')
 
         if not post:
             flash("投稿が見つかりません", "danger")
             return redirect(url_for('board'))
 
+        # ユーザー認可の確認
+        if post['user#user_id'] != current_user.user_id:
+            flash("この投稿を編集する権限がありません", "danger")
+            return redirect(url_for('board'))
+
         if request.method == 'POST' and form.validate_on_submit():
-            # 更新するフィールドを準備
             updated_post = {
                 'title': form.title.data,
                 'content': form.content.data,
                 'author_name': current_user.display_name,
             }
 
+            # 画像の処理
+            image_url = post.get('image_url', None)
+
+            # 画像削除
+            if form.remove_image.data and image_url:
+                try:
+                    s3_path = image_url.split(f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/")[1]
+                    app.s3.delete_object(Bucket=app.config['S3_BUCKET'], Key=s3_path)
+                    image_url = None
+                except Exception as e:
+                    flash(f"画像の削除に失敗しました: {str(e)}", "danger")
+
+            # 新しい画像をアップロード
+            if form.image.data:
+                try:
+                    image_file = form.image.data
+                    filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
+                    s3_path = f"board/{filename}"
+                    image_file.stream.seek(0)
+                    app.s3.upload_fileobj(
+                        image_file.stream,
+                        app.config['S3_BUCKET'],
+                        s3_path,
+                        ExtraArgs={'ContentType': image_file.content_type}
+                    )
+                    image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
+                except Exception as e:
+                    flash(f"画像のアップロードに失敗しました: {str(e)}", "danger")
+                    return redirect(url_for('edit_post', post_id=post_id))
+
+            updated_post['image_url'] = image_url
+
             # 投稿を更新
             board_table.update_item(
-                Key={'post#post_id': post_id},
-                UpdateExpression="SET title = :title, content = :content, author_name = :author_name",
+                Key={
+                    'user#user_id': current_user.user_id,
+                    'post#post_id': post_id
+                },
+                UpdateExpression="""SET title = :title, 
+                                     content = :content, 
+                                     author_name = :author_name, 
+                                     image_url = :image_url""",
                 ExpressionAttributeValues={
                     ':title': updated_post['title'],
                     ':content': updated_post['content'],
                     ':author_name': updated_post['author_name'],
+                    ':image_url': updated_post['image_url'],
                 }
             )
 
             flash("投稿が更新されました", "success")
             return redirect(url_for('board'))
 
-        # フォームに既存の投稿データをセット
-        form.title.data = post.get('title')
-        form.content.data = post.get('content')
+        form.title.data = post.get('title', '')
+        form.content.data = post.get('content', '')
 
     except Exception as e:
         flash(f"投稿の編集に失敗しました: {str(e)}", "danger")
