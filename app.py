@@ -1092,6 +1092,120 @@ def get_board_table():
     return dynamodb.Table('bad-board-table')
 
 
+# @app.route('/board', methods=['GET', 'POST'])
+
+# def board():
+#     form = Board_Form()
+#     board_table = get_board_table()      
+    
+#     try:
+#         response = board_table.scan()
+#         posts = response.get('Items', [])
+#         print(f"Raw posts from DynamoDB: {posts}")
+
+#         formatted_posts = []
+#         for post in posts:
+#             print(f"Raw post data: {post}")
+
+#             # image_urlのキーの存在確認と、空文字列やNoneの場合の処理
+#             image_url = post.get('image_url')
+#             if image_url is None or image_url == '':
+#                 image_url = ''  # デフォルト値を設定
+
+#             formatted_post = {
+#                 'user#user_id': post.get('user#user_id', ''),
+#                 'post#post_id': post.get('post#post_id', ''),
+#                 'title': post.get('title', ''),
+#                 'content': post.get('content', ''),
+#                 'created_at': post.get('created_at', ''),
+#                 'updated_at': post.get('updated_at', ''),  # 追加
+#                 'image_url': image_url,
+#                 'author_name': post.get('author_name', '名前未設定'),
+#                 'admin_memo': post.get('admin_memo', '')  # 管理者用メモを追加
+#             }
+#             print(f"Formatted post: {formatted_post}")
+#             formatted_posts.append(formatted_post)
+
+#         # formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
+#         # print(f"Retrieved and formatted {len(formatted_posts)} posts")
+
+#         formatted_posts.sort(
+#         key=lambda x: datetime.strptime(x['updated_at'], '%Y-%m-%d %H:%M:%S') if x.get('updated_at') else datetime.strptime(x['created_at'], '%Y-%m-%d %H:%M:%S'),
+#         reverse=True
+# )
+
+#     except Exception as e:
+#         formatted_posts = []
+#         print(f"Error retrieving posts: {str(e)}")
+#         flash(f"データの取得に失敗しました: {str(e)}", "danger")
+
+#     if form.validate_on_submit():
+#         print("Form validated successfully")
+#         try:
+#             image_url = ''  # デフォルト値を空文字列に設定
+#             if form.image.data:
+#                 print(f"Image data detected: {form.image.data}")
+#                 image_file = form.image.data
+
+#                 if not image_file.filename:
+#                     print("No filename provided")
+#                     flash("ファイル名が無効です", "danger")
+#                     return redirect(url_for('board'))
+
+#                 filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
+#                 s3_path = f"board/{filename}"
+#                 print(f"Generated S3 path: {s3_path}")               
+
+#                 try:
+#                     image_file.stream.seek(0)
+#                     app.s3.upload_fileobj(
+#                         image_file.stream,
+#                         app.config['S3_BUCKET'],
+#                         s3_path,
+#                         ExtraArgs={'ContentType': image_file.content_type}
+#                     )
+#                     # S3のURLを確実に生成
+#                     image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
+#                     print(f"Generated image URL: {image_url}")  # URLが生成されたことを確認
+#                 except Exception as e:
+#                     print(f"S3 upload failed: {str(e)}")
+#                     flash(f"画像のアップロードに失敗しました: {str(e)}", "danger")
+#                     return redirect(url_for('board'))
+
+#             print("Preparing data for DynamoDB")
+#             new_post = {
+#                 'user#user_id': current_user.user_id,
+#                 'post#post_id': str(uuid.uuid4()),
+#                 'title': form.title.data,
+#                 'content': form.content.data,
+#                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+#                 'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 追加
+#                 'author_name': current_user.display_name,
+#                 'image_url': image_url  # 空文字列かURLのいずれかが設定される
+#             }
+#             # 管理者の場合、admin_memo を追加
+#             if current_user.is_admin:
+#                 new_post['admin_memo'] = form.admin_memo.data or ''  # フォームに入力がない場合は空文字列を設定
+#             print(f"New post data to save: {new_post}")           
+                
+#             try:
+#                 board_table.put_item(Item=new_post)
+#                 print(f"Post saved to DynamoDB with image_url: {image_url}")
+#             except Exception as e:
+#                 print(f"Error saving post to DynamoDB: {str(e)}")
+#                 flash(f"データの保存に失敗しました: {str(e)}", "danger")
+#                 return redirect(url_for('board'))
+
+#             flash('投稿が成功しました！', 'success')
+#             return redirect(url_for('board'))
+
+#         except Exception as e:
+#             print(f"Unexpected error: {str(e)}")
+#             flash(f"予期しないエラーが発生しました: {str(e)}", "danger")
+#             return redirect(url_for('board'))
+        
+#     return render_template('board.html', form=form, posts=formatted_posts)
+
 @app.route('/board', methods=['GET', 'POST'])
 
 def board():
@@ -1152,21 +1266,52 @@ def board():
                     flash("ファイル名が無効です", "danger")
                     return redirect(url_for('board'))
 
-                filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
-                s3_path = f"board/{filename}"
-                print(f"Generated S3 path: {s3_path}")               
-
                 try:
-                    image_file.stream.seek(0)
+                    # 画像を開いて処理
+                    img = Image.open(image_file)
+
+                    # EXIF情報に基づいて画像を回転
+                    try:
+                        exif = img._getexif()
+                        if exif is not None:
+                            for orientation in ExifTags.TAGS.keys():
+                                if ExifTags.TAGS[orientation] == "Orientation":
+                                    break
+                            orientation_value = exif.get(orientation)
+                            if orientation_value == 3:
+                                img = img.rotate(180, expand=True)
+                            elif orientation_value == 6:
+                                img = img.rotate(270, expand=True)
+                            elif orientation_value == 8:
+                                img = img.rotate(90, expand=True)
+                    except (AttributeError, KeyError, IndexError):
+                        pass
+
+                    # リサイズ処理
+                    max_width = 800
+                    if img.width > max_width:
+                        new_height = int((max_width / img.width) * img.height)
+                        img = img.resize((max_width, new_height), Image.LANCZOS)
+
+                    # 処理した画像をバイトストリームに保存
+                    img_byte_arr = io.BytesIO()
+                    img.save(img_byte_arr, format='JPEG', quality=85)
+                    img_byte_arr.seek(0)
+
+                    # S3にアップロード
+                    filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
+                    s3_path = f"board/{filename}"
+                    
                     app.s3.upload_fileobj(
-                        image_file.stream,
+                        img_byte_arr,
                         app.config['S3_BUCKET'],
                         s3_path,
-                        ExtraArgs={'ContentType': image_file.content_type}
+                        ExtraArgs={'ContentType': 'image/jpeg'}
                     )
-                    # S3のURLを確実に生成
+                    
                     image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
-                    print(f"Generated image URL: {image_url}")  # URLが生成されたことを確認
+                    print(f"Generated image URL: {image_url}")
+
                 except Exception as e:
                     print(f"S3 upload failed: {str(e)}")
                     flash(f"画像のアップロードに失敗しました: {str(e)}", "danger")
@@ -1206,45 +1351,6 @@ def board():
         
     return render_template('board.html', form=form, posts=formatted_posts)
 
-
-# @app.route('/post/<string:post_id>/update-memo', methods=['POST'])
-# @login_required
-# def update_admin_memo(post_id):
-#     if not current_user.is_admin:
-#         flash('権限がありません', 'danger')
-#         return redirect(url_for('index'))
-
-#     try:
-#         admin_memo = request.form.get('admin_memo')
-#         board_table = get_board_table()
-        
-#         # 投稿を取得して更新
-#         response = board_table.get_item(
-#             Key={
-#                 'user#user_id': current_user.user_id,
-#                 'post#post_id': post_id
-#             }
-#         )
-#         if 'Item' in response:
-#             board_table.update_item(
-#                 Key={
-#                     'user#user_id': current_user.user_id,
-#                     'post#post_id': post_id
-#                 },
-#                 UpdateExpression="SET admin_memo = :memo",
-#                 ExpressionAttributeValues={
-#                     ':memo': admin_memo
-#                 }
-#             )
-#             flash('メモを更新しました', 'success')
-#         else:
-#             flash('投稿が見つかりません', 'danger')
-    
-#     except Exception as e:
-#         flash('メモの更新に失敗しました', 'danger')
-#         print(f"Error updating memo: {str(e)}")
-
-#     return redirect(url_for('index'))
 
 
 @app.route('/post/<string:post_id>/update-memo', methods=['POST'])

@@ -30,7 +30,7 @@
         {% if current_user.is_authenticated and current_user.is_admin %}
         <div class="mb-3">
             {{ form.admin_memo.label(class="form-label") }}
-            {{ form.admin_memo(class="form-control", rows="5", placeholder="管理者用メモを入力してください") }}
+            {{ form.admin_memo(class="form-control", rows="6", placeholder="管理者用メモを入力してください") }}
             {% for error in form.admin_memo.errors %}
                 <div class="text-danger">{{ error }}</div>
             {% endfor %}
@@ -89,7 +89,7 @@
                         {% endif %}
                         <form method="post" action="{{ url_for('update_admin_memo', post_id=post['post#post_id']) }}">
                             <div class="form-group">
-                                <textarea class="form-control form-control-sm" name="admin_memo" rows="2" placeholder="メモを編集...">{{ post.admin_memo }}</textarea>
+                                <textarea class="form-control form-control-sm" name="admin_memo" rows="6" placeholder="メモを編集...">{{ post.admin_memo }}</textarea>
                             </div>
                             <div class="mt-2 text-end">
                                 <button type="submit" class="btn btn-secondary btn-sm">メモを保存</button>
