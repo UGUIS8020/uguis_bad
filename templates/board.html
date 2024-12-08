@@ -77,7 +77,7 @@
                 <div class="card-body">
                     <p class="card-text" style="white-space: pre-wrap;">{{ post.content }}</p>
                     {% if post.image_url %}
-                        <img src="{{ post.image_url }}" alt="投稿画像" class="img-fluid mb-3" style="max-width: 400px;">
+                        <img src="{{ post.image_url }}" alt="投稿画像" class="img-fluid mb-3" style="max-width: 100%; height: auto;">
                     {% endif %}
                     
                     <!-- 管理者専用メモ（表示と編集フォーム） -->
