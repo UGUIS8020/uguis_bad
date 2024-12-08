@@ -139,8 +139,8 @@ def load_user(user_id):
 
 
 class RegistrationForm(FlaskForm):
-    organization = SelectField('所属', choices=[('uguis', '鶯'),('other', 'その他')], default='uguis', validators=[DataRequired(message='所属を選択してください')])
-    display_name = StringField('表示名 LINE名など', validators=[DataRequired(message='表示名を入力してください'), Length(min=3, max=30, message='表示名は3文字以上30文字以下で入力してください')])
+    organization = SelectField('所属', choices=[('uguis', '鶯'),('other', 'その他')], default='鶯', validators=[DataRequired(message='所属を選択してください')])
+    display_name = StringField('表示名 LINE名など', validators=[DataRequired(message='表示名を入力してください'), Length(min=1, max=30, message='表示名は1文字以上30文字以下で入力してください')])
     user_name = StringField('ユーザー名', validators=[DataRequired()])
     furigana = StringField('フリガナ', validators=[DataRequired()])
     phone = StringField('電話番号', validators=[DataRequired(), Length(min=10, max=15, message='正しい電話番号を入力してください')])
@@ -148,7 +148,7 @@ class RegistrationForm(FlaskForm):
     address = StringField('住所', validators=[DataRequired(), Length(max=100, message='住所は100文字以内で入力してください')])
     email = StringField('メールアドレス', validators=[DataRequired(), Email(message='正しいメールアドレスを入力してください')])
     email_confirm = StringField('メールアドレス確認', validators=[DataRequired(), Email(), EqualTo('email', message='メールアドレスが一致していません')])
-    password = PasswordField('パスワード', validators=[DataRequired(), Length(min=8, message='パスワードは8文字以上で入力してください'), EqualTo('pass_confirm', message='パスワードが一致していません')])
+    password = PasswordField('8文字以上のパスワード', validators=[DataRequired(), Length(min=8, message='パスワードは8文字以上で入力してください'), EqualTo('pass_confirm', message='パスワードが一致していません')])
     pass_confirm = PasswordField('パスワード(確認)', validators=[DataRequired()])    
     gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])
     date_of_birth = DateField('生年月日', format='%Y-%m-%d', validators=[DataRequired()])
@@ -165,13 +165,14 @@ class RegistrationForm(FlaskForm):
 
     def validate_email(self, field):
         try:
+            table = app.dynamodb.Table(app.table_name)
             # emailのインデックスを使用して検索
-            response = app.dynamodb.query(
-                TableName=app.table_name,
+            # email-indexを使用してメールアドレスを検索
+            response = table.query(
                 IndexName='email-index',
                 KeyConditionExpression='email = :email',
                 ExpressionAttributeValues={
-                    ':email': {'S': field.data}
+                    ':email': field.data
                 }
             )
             if response.get('Items'):
@@ -182,23 +183,21 @@ class RegistrationForm(FlaskForm):
         
         
 class UpdateUserForm(FlaskForm):
-    organization = SelectField('所属', choices=[('uguis', '鶯'), ('other', 'その他')], validators=[DataRequired(message='所属を選択してください')])    
-    display_name = StringField('表示名 LINE名など', validators=[DataRequired(), Length(min=3, max=30)])    
-    user_name = StringField('ユーザー名', validators=[DataRequired()])    
-    furigana = StringField('フリガナ',  validators=[DataRequired()])    
-    phone = StringField('電話番号', validators=[DataRequired(), Length(min=10, max=15, message='正しい電話番号を入力してください')])    
-    post_code = StringField('郵便番号', validators=[DataRequired(), Length(min=7, max=7, message='ハイフン無しで７桁で入力してください')])    
-    address = StringField('住所', validators=[DataRequired(), Length(max=100, message='住所は100文字以内で入力してください')])    
-    email = StringField('メールアドレス', validators=[DataRequired(), Email(message='正しいメールアドレスを入力してください')])    
+    organization = SelectField('所属', choices=[('uguis', '鶯'), ('other', 'その他')], validators=[DataRequired()])
+    display_name = StringField('表示名 LINE名など', validators=[DataRequired(), Length(min=3, max=30)])
+    user_name = StringField('ユーザー名', validators=[DataRequired()])
+    furigana = StringField('フリガナ', validators=[DataRequired()])
+    phone = StringField('電話番号', validators=[DataRequired(), Length(min=10, max=15)])
+    post_code = StringField('郵便番号', validators=[DataRequired(), Length(min=7, max=7)])
+    address = StringField('住所', validators=[DataRequired(), Length(max=100)])
+    email = StringField('メールアドレス', validators=[DataRequired(), Email()])
     email_confirm = StringField('メールアドレス(確認)', validators=[DataRequired(), Email(), EqualTo('email', message='メールアドレスが一致していません')])
-    password = PasswordField('パスワード', validators=[Optional(),  # パスワード変更は任意
-                                                  Length(min=8, message='パスワードは8文字以上で入力してください'),EqualTo('pass_confirm', message='パスワードが一致していません')])    
-    pass_confirm = PasswordField('パスワード(確認)')    
-    gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])    
-    date_of_birth = DateField('生年月日', format='%Y-%m-%d', validators=[DataRequired()])    
+    password = PasswordField('パスワード', validators=[Optional(), Length(min=8), EqualTo('pass_confirm', message='パスワードが一致していません')])
+    pass_confirm = PasswordField('パスワード(確認)')
+    gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])
+    date_of_birth = DateField('生年月日', format='%Y-%m-%d', validators=[DataRequired()])
     guardian_name = StringField('保護者氏名', validators=[Optional()])
-    emergency_phone = StringField('緊急連絡先電話番号', validators=[Optional(), Length(min=10, max=15, message='正しい電話番号を入力してください')])
-
+    emergency_phone = StringField('緊急連絡先電話番号', validators=[Optional(), Length(min=10, max=15)])
     submit = SubmitField('更新')
 
     def __init__(self, user_id, dynamodb_table, *args, **kwargs):
@@ -207,7 +206,6 @@ class UpdateUserForm(FlaskForm):
         self.table = dynamodb_table
 
     def validate_email(self, field):
-        """メールアドレスの重複チェック（自分のメールアドレスは除外）"""
         try:
             response = self.table.query(
                 IndexName='email-index',
@@ -216,14 +214,16 @@ class UpdateUserForm(FlaskForm):
                     ':email': field.data
                 }
             )
-            
-            # 検索結果があり、かつ自分以外のユーザーの場合はエラー
+
+            app.logger.debug(f"Query response: {response}")
+
             if response.get('Items'):
                 for item in response['Items']:
-                    if item['user_id']['S'] != f'user#{self.id}':
+                    user_id = item.get('user#user_id') or item.get('user_id')
+                    if user_id and user_id != self.id:
                         raise ValidationError('このメールアドレスは既に使用されています。')
-                        
         except ClientError as e:
+            app.logger.error(f"Error querying DynamoDB: {e}")
             raise ValidationError('メールアドレスの確認中にエラーが発生しました。')
       
 
@@ -275,7 +275,7 @@ class User(UserMixin):
             phone=get_value('phone'),
             guardian_name=get_value('guardian_name', default=None),  # 新しいフィールド
             emergency_phone=get_value('emergency_phone', default=None),  # 新しいフィールド
-            organization=get_value('organization', default='uguis'),
+            organization=get_value('organization', default='鶯'),
             administrator=bool(get_value('administrator', False)),
             created_at=get_value('created_at'),
             updated_at=get_value('updated_at')
@@ -528,15 +528,16 @@ def signup():
         try:
             current_time = datetime.now().isoformat()
             hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256')
-            user_id = str(uuid.uuid4())
+            user_id = str(uuid.uuid4())          
+
+            table = app.dynamodb.Table(app.table_name) 
 
             # メールアドレスの重複チェック用のクエリ
-            email_check = app.dynamodb.query(
-                TableName=app.table_name,
+            email_check = table.query(
                 IndexName='email-index',
                 KeyConditionExpression='email = :email',
                 ExpressionAttributeValues={
-                    ':email': {'S': form.email.data}
+                    ':email': form.email.data
                 }
             )
 
@@ -546,30 +547,54 @@ def signup():
                 return redirect(url_for('signup'))
 
             # ユーザーの保存
-            response = app.dynamodb.put_item(
-                TableName=app.table_name,
-                Item={                     
-                    "user#user_id": {"S": user_id},
-                    "organization": {"S": form.organization.data},  # 所属を追加
-                    "address": {"S": form.address.data},
-                    "administrator": {"BOOL": False},
-                    "created_at": {"S": current_time},
-                    "date_of_birth": {"S": form.date_of_birth.data.strftime('%Y-%m-%d')},
-                    "display_name": {"S": form.display_name.data},
-                    "email": {"S": form.email.data},
-                    "furigana": {"S": form.furigana.data},
-                    "gender": {"S": form.gender.data},
-                    "password": {"S": hashed_password},
-                    "phone": {"S": form.phone.data},
-                    "post_code": {"S": form.post_code.data},
-                    "updated_at": {"S": current_time},
-                    "user_name": {"S": form.user_name.data},
-                    "guardian_name": {"S": form.guardian_name.data}, 
-                    "emergency_phone": {"S": form.emergency_phone.data}
+            # response = app.dynamodb.put_item(
+            #     TableName=app.table_name,
+            #     Item={                     
+            #         "user#user_id": {"S": user_id},
+            #         "organization": {"S": form.organization.data},  # 所属を追加
+            #         "address": {"S": form.address.data},
+            #         "administrator": {"BOOL": False},
+            #         "created_at": {"S": current_time},
+            #         "date_of_birth": {"S": form.date_of_birth.data.strftime('%Y-%m-%d')},
+            #         "display_name": {"S": form.display_name.data},
+            #         "email": {"S": form.email.data},
+            #         "furigana": {"S": form.furigana.data},
+            #         "gender": {"S": form.gender.data},
+            #         "password": {"S": hashed_password},
+            #         "phone": {"S": form.phone.data},
+            #         "post_code": {"S": form.post_code.data},
+            #         "updated_at": {"S": current_time},
+            #         "user_name": {"S": form.user_name.data},
+            #         "guardian_name": {"S": form.guardian_name.data}, 
+            #         "emergency_phone": {"S": form.emergency_phone.data}
                     
+            #     },
+            #     ReturnValues="NONE"
+            # )
+
+            app.table.put_item(
+                Item={
+                    "user#user_id": user_id,  # 注意: DynamoDBリソースAPIではデータ型を指定する必要がありません
+                    "organization": form.organization.data,
+                    "address": form.address.data,
+                    "administrator": False,
+                    "created_at": current_time,
+                    "date_of_birth": form.date_of_birth.data.strftime('%Y-%m-%d'),
+                    "display_name": form.display_name.data,
+                    "email": form.email.data,
+                    "furigana": form.furigana.data,
+                    "gender": form.gender.data,
+                    "password": hashed_password,
+                    "phone": form.phone.data,
+                    "post_code": form.post_code.data,
+                    "updated_at": current_time,
+                    "user_name": form.user_name.data,
+                    "guardian_name": form.guardian_name.data,
+                    "emergency_phone": form.emergency_phone.data
                 },
-                ReturnValues="NONE"
+                ConditionExpression='attribute_not_exists(user_id)'
             )
+            
 
             # ログ出力を詳細に
             app.logger.info(f"New user created - ID: {user_id}, Organization: {form.organization.data}, Email: {form.email.data}")
@@ -887,41 +912,102 @@ def get_table_info():
 
     
 
+# @app.route('/account/<string:user_id>', methods=['GET', 'POST'])
+# def account(user_id):
+#     try:
+#         table = app.dynamodb.Table(app.table_name)  # Table オブジェクトを取得
+#         response = table.get_item(
+#             Key={
+#                 'user#user_id': user_id
+#             }
+#         )
+#         user = response.get('Item')
+#         app.logger.debug(f"Retrieved user data: {user}")
+        
+#         if not user:
+#             abort(404)
+
+#         user['user_id'] = user.pop('user#user_id')
+#         app.logger.debug(f"Processed user data: {user}")
+            
+#         # 現在のユーザーが対象ユーザーまたは管理者であることを確認
+#         # if user['user_id']['S'] != current_user.get_id() and not current_user.administrator:
+#         #     abort(403)
+
+#         if not user or 'user_id' not in user:
+#             app.logger.warning(f"Invalid user data: {user}")
+#             abort(404)
+                
+#         form = UpdateUserForm(user_id=user_id, dynamodb_table=app.table)
+        
+#         if request.method == 'GET':
+#               # 任意フィールドは存在チェックを行う
+#             if 'guardian_name' in user:
+#                 form.guardian_name.data = user['guardian_name']
+#             if 'emergency_phone' in user:
+#                 form.emergency_phone.data = user['emergency_phone']
+#             # GETリクエスト時はフォームに値を設定するだけ
+#             form.display_name.data = user['display_name']
+#             form.user_name.data = user['user_name']
+#             form.furigana.data = user['furigana']
+#             form.email.data = user['email']
+#             form.phone.data = user['phone']
+#             form.post_code.data = user['post_code']
+#             form.address.data = user['address']
+#             form.gender.data = user['gender']
+#             form.date_of_birth.data = datetime.strptime(user['date_of_birth'], '%Y-%m-%d')            
+#             form.organization.data = user['organization']
+#              #任意のフィールド
+#             form.guardian_name.data = user.get('guardian_name', '')           
+#             form.emergency_phone.data = user.get('emergency_phone', '')
+            
+#         elif form.validate_on_submit():  # POSTリクエストの処理
+#             current_time = datetime.now().isoformat()
+#             update_expression_parts = []
+#             expression_values = {}
+            
+#             # 更新する項目を設定
+#             update_expression_parts.append("display_name = :display_name")
+#             expression_values[':display_name'] = {'S': form.display_name.data}
+#             # 他のフィールドも同様に追加
+            
+#             # DynamoDBを更新
+#             response = app.dynamodb.update_item(
+#                 TableName=app.table_name,
+#                 Key={
+#                     'user#user_id': {'S': user_id}                    
+#                 },               
+#                 UpdateExpression="SET " + ", ".join(update_expression_parts),
+#                 ExpressionAttributeValues=expression_values,
+#                 ReturnValues="UPDATED_NEW"
+#             )
+            
+#             flash('ユーザーアカウントが更新されました', 'success')
+#             return redirect(url_for('user_maintenance'))
+        
+#         return render_template('account.html', form=form, user=user)
+        
+#     except ClientError as e:
+#         app.logger.error(f"DynamoDB error: {str(e)}")
+#         flash('データベースエラーが発生しました。', 'error')
+#         return redirect(url_for('user_maintenance'))   
+    
+
 @app.route('/account/<string:user_id>', methods=['GET', 'POST'])
 def account(user_id):
     try:
-        table = app.dynamodb.Table(app.table_name)  # Table オブジェクトを取得
-        response = table.get_item(
-            Key={
-                'user#user_id': user_id
-            }
-        )
+        table = app.dynamodb.Table(app.table_name)
+        response = table.get_item(Key={'user#user_id': user_id})
         user = response.get('Item')
-        app.logger.debug(f"Retrieved user data: {user}")
-        
+
         if not user:
             abort(404)
 
         user['user_id'] = user.pop('user#user_id')
-        app.logger.debug(f"Processed user data: {user}")
-            
-        # 現在のユーザーが対象ユーザーまたは管理者であることを確認
-        # if user['user_id']['S'] != current_user.get_id() and not current_user.administrator:
-        #     abort(403)
 
-        if not user or 'user_id' not in user:
-            app.logger.warning(f"Invalid user data: {user}")
-            abort(404)
-                
         form = UpdateUserForm(user_id=user_id, dynamodb_table=app.table)
-        
+
         if request.method == 'GET':
-              # 任意フィールドは存在チェックを行う
-            if 'guardian_name' in user:
-                form.guardian_name.data = user['guardian_name']
-            if 'emergency_phone' in user:
-                form.emergency_phone.data = user['emergency_phone']
-            # GETリクエスト時はフォームに値を設定するだけ
             form.display_name.data = user['display_name']
             form.user_name.data = user['user_name']
             form.furigana.data = user['furigana']
@@ -930,42 +1016,44 @@ def account(user_id):
             form.post_code.data = user['post_code']
             form.address.data = user['address']
             form.gender.data = user['gender']
-            form.date_of_birth.data = datetime.strptime(user['date_of_birth'], '%Y-%m-%d')            
+            form.date_of_birth.data = datetime.strptime(user['date_of_birth'], '%Y-%m-%d')
             form.organization.data = user['organization']
-             #任意のフィールド
-            form.guardian_name.data = user.get('guardian_name', '')           
+            form.guardian_name.data = user.get('guardian_name', '')
             form.emergency_phone.data = user.get('emergency_phone', '')
-            
-        elif form.validate_on_submit():  # POSTリクエストの処理
+
+        elif form.validate_on_submit():
             current_time = datetime.now().isoformat()
             update_expression_parts = []
             expression_values = {}
-            
-            # 更新する項目を設定
+
+            # 他のフィールドの更新
             update_expression_parts.append("display_name = :display_name")
-            expression_values[':display_name'] = {'S': form.display_name.data}
-            # 他のフィールドも同様に追加
-            
-            # DynamoDBを更新
-            response = app.dynamodb.update_item(
-                TableName=app.table_name,
-                Key={
-                    'user#user_id': {'S': user_id}                    
-                },               
+            expression_values[':display_name'] = form.display_name.data
+
+            # パスワードが入力されている場合のみ更新
+            if form.password.data:
+                hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256')
+                update_expression_parts.append("password_hash = :password_hash")
+                expression_values[':password_hash'] = hashed_password
+
+            # DynamoDB を更新
+            table = app.dynamodb.Table(app.table_name)
+            response = table.update_item(
+                Key={'user#user_id': user_id},
                 UpdateExpression="SET " + ", ".join(update_expression_parts),
                 ExpressionAttributeValues=expression_values,
                 ReturnValues="UPDATED_NEW"
-            )
-            
+            )                    
+
             flash('ユーザーアカウントが更新されました', 'success')
             return redirect(url_for('user_maintenance'))
-        
+
         return render_template('account.html', form=form, user=user)
-        
+
     except ClientError as e:
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('データベースエラーが発生しました。', 'error')
-        return redirect(url_for('user_maintenance'))   
+        return redirect(url_for('user_maintenance'))
     
 
 @app.route("/delete_user/<string:user_id>")
