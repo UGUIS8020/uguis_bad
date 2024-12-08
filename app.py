@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_caching import Cache
 from flask_wtf import FlaskForm
 from flask import render_template, request, redirect, url_for, flash, abort, session
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
@@ -22,6 +23,7 @@ import random
 from urllib.parse import urlparse, urljoin
 from dotenv import load_dotenv
 
+cache = Cache()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,6 +43,12 @@ def create_app():
         # Secret Keyの設定
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(24))
         print(f"Secret key: {app.config['SECRET_KEY']}")
+
+        # キャッシュの設定と初期化
+        app.config["CACHE_TYPE"] = "simple"
+        app.config["CACHE_DEFAULT_TIMEOUT"] = 1800
+        cache.init_app(app)
+       
 
         # AWS認証情報の設定
         aws_credentials = {
@@ -461,6 +469,7 @@ def index():
             }
 
             schedule_table.put_item(Item=schedule_data)
+            cache.delete_memoized(get_schedules_with_formatting)
             flash('スケジュールが登録されました', 'success')
             return redirect(url_for('index'))
 
@@ -484,11 +493,9 @@ def index():
     canonical=url_for('index', _external=True)
     )
 
-
+@cache.memoize(timeout=1800)
 def get_schedules_with_formatting():
-    """
-    スケジュール一覧を取得し、日付をフォーマットして返す
-    """
+    print("DynamoDBからデータを取得中...")
     schedule_table = get_schedule_table()
     if not schedule_table:
         raise ValueError("Schedule table is not initialized")
@@ -506,7 +513,11 @@ def get_schedules_with_formatting():
         schedules.append(schedule)
 
     return schedules
-  
+
+@app.route('/clear-cache')
+def clear_cache():
+    cache.delete_memoized(get_schedules_with_formatting)
+    return 'キャッシュをクリアしました'  
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -1183,24 +1194,6 @@ def board():
     return render_template('board.html', form=form, posts=formatted_posts)
 
 
-# @app.route('/board/delete/<string:post_id>', methods=['POST'])
-# def delete_post(post_id):
-#     board_table = get_board_table()
-
-#     try:
-#         print(f"Deleting post with keys: user#user_id={current_user.user_id}, post#post_id={post_id}")
-        
-#         board_table.delete_item(Key={
-#             'user#user_id': current_user.user_id,
-#             'post#post_id': post_id
-#         })
-        
-#         flash("投稿が削除されました", "success")
-#     except Exception as e:
-#         print(f"Error deleting post: {str(e)}")
-#         flash(f"投稿の削除に失敗しました: {str(e)}", "danger")
-
-#     return redirect(url_for('board'))
 
 @app.route('/board/delete/<string:post_id>', methods=['POST'])
 @login_required
