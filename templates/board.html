@@ -4,7 +4,7 @@
 
 {% block content %}
     <div class="container mt-4 mb-4">
-        <h1 class="text-center mb-4">お知らせ（テスト運用中）</h1>
+        <h1 class="text-center mb-4">お知らせ</h1>
 
         {% if current_user.is_authenticated %}
         <!-- 投稿フォーム -->
@@ -47,12 +47,19 @@
             {% for post in posts %}
             <div class="col-12">
                 <div class="card mb-4">
+                    <div class="card-header fw-bold" style="background-color: #8ea604;">
+                        {{ post.title }}
+                    </div>
                     <div class="card-header">
-                        {{ post.title }} - 投稿者: {{ post.author_name }}
-                        {% if post.organization %}
-                            <span class="text-muted">({{ post.organization }})</span>
-                        {% endif %}
-                        <small class="text-muted float-end">{{ post.created_at }}</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                投稿者: {{ post.author_name }}
+                                {% if post.organization %}
+                                    <span class="text-muted">({{ post.organization }})</span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">{{ post.created_at }}</small>
+                        </div>
                     </div>
                     <div class="card-body">
                         <p class="card-text">{{ post.content }}</p>
