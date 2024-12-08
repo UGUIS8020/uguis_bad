@@ -1183,21 +1183,76 @@ def board():
     return render_template('board.html', form=form, posts=formatted_posts)
 
 
+# @app.route('/board/delete/<string:post_id>', methods=['POST'])
+# def delete_post(post_id):
+#     board_table = get_board_table()
+
+#     try:
+#         print(f"Deleting post with keys: user#user_id={current_user.user_id}, post#post_id={post_id}")
+        
+#         board_table.delete_item(Key={
+#             'user#user_id': current_user.user_id,
+#             'post#post_id': post_id
+#         })
+        
+#         flash("投稿が削除されました", "success")
+#     except Exception as e:
+#         print(f"Error deleting post: {str(e)}")
+#         flash(f"投稿の削除に失敗しました: {str(e)}", "danger")
+
+#     return redirect(url_for('board'))
+
 @app.route('/board/delete/<string:post_id>', methods=['POST'])
+@login_required
 def delete_post(post_id):
     board_table = get_board_table()
 
     try:
-        print(f"Deleting post with keys: user#user_id={current_user.user_id}, post#post_id={post_id}")
+        # 最初に投稿データを取得して画像URLを確認
+        response = board_table.get_item(
+            Key={
+                'user#user_id': current_user.user_id,
+                'post#post_id': post_id
+            }
+        )
         
-        board_table.delete_item(Key={
-            'user#user_id': current_user.user_id,
-            'post#post_id': post_id
-        })
+        if 'Item' not in response:
+            flash("投稿が見つかりませんでした", "danger")
+            return redirect(url_for('board'))
+            
+        post = response['Item']
+        image_url = post.get('image_url')
         
+        # S3から画像を削除（画像URLが存在する場合）
+        if image_url and image_url.strip():
+            try:
+                # S3のパスを抽出 (https://bucket-name.s3.amazonaws.com/path/to/file から path/to/file を取得)
+                s3_path = image_url.split('.com/')[-1]
+                print(f"Attempting to delete S3 object: {s3_path}")
+                
+                app.s3.delete_object(
+                    Bucket=app.config['S3_BUCKET'],
+                    Key=s3_path
+                )
+                print(f"Successfully deleted S3 object: {s3_path}")
+            except Exception as e:
+                print(f"Error deleting S3 object: {str(e)}")
+                # S3削除のエラーはユーザーに通知するが、処理は続行
+                flash(f"画像の削除中にエラーが発生しました: {str(e)}", "warning")
+        
+        # DynamoDBから投稿を削除
+        board_table.delete_item(
+            Key={
+                'user#user_id': current_user.user_id,
+                'post#post_id': post_id
+            }
+        )
+        
+        print(f"Successfully deleted post and associated image")
         flash("投稿が削除されました", "success")
+        
     except Exception as e:
-        print(f"Error deleting post: {str(e)}")
+        print(f"Error in delete_post: {str(e)}")
         flash(f"投稿の削除に失敗しました: {str(e)}", "danger")
 
     return redirect(url_for('board'))
