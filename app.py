@@ -424,6 +424,8 @@ class Board_Form(FlaskForm):
             Length(max=2000, message='内容は2000文字以内で入力してください')
         ])
     
+    admin_memo = TextAreaField('管理者用メモ', validators=[Optional()])  # 追加
+    
     image = FileField('ファイル', 
         validators=[
             FileAllowed(
@@ -1118,6 +1120,7 @@ def board():
                 'created_at': post.get('created_at', ''),
                 'image_url': image_url,
                 'author_name': post.get('author_name', '名前未設定'),
+                'admin_memo': post.get('admin_memo', '')  # 管理者用メモを追加
             }
             print(f"Formatted post: {formatted_post}")
             formatted_posts.append(formatted_post)
@@ -1173,6 +1176,9 @@ def board():
                 'author_name': current_user.display_name,
                 'image_url': image_url  # 空文字列かURLのいずれかが設定される
             }
+            # 管理者の場合、admin_memo を追加
+            if current_user.is_admin:
+                new_post['admin_memo'] = form.admin_memo.data or ''  # フォームに入力がない場合は空文字列を設定
             print(f"New post data to save: {new_post}")           
                 
             try:
@@ -1193,6 +1199,89 @@ def board():
         
     return render_template('board.html', form=form, posts=formatted_posts)
 
+
+# @app.route('/post/<string:post_id>/update-memo', methods=['POST'])
+# @login_required
+# def update_admin_memo(post_id):
+#     if not current_user.is_admin:
+#         flash('権限がありません', 'danger')
+#         return redirect(url_for('index'))
+
+#     try:
+#         admin_memo = request.form.get('admin_memo')
+#         board_table = get_board_table()
+        
+#         # 投稿を取得して更新
+#         response = board_table.get_item(
+#             Key={
+#                 'user#user_id': current_user.user_id,
+#                 'post#post_id': post_id
+#             }
+#         )
+#         if 'Item' in response:
+#             board_table.update_item(
+#                 Key={
+#                     'user#user_id': current_user.user_id,
+#                     'post#post_id': post_id
+#                 },
+#                 UpdateExpression="SET admin_memo = :memo",
+#                 ExpressionAttributeValues={
+#                     ':memo': admin_memo
+#                 }
+#             )
+#             flash('メモを更新しました', 'success')
+#         else:
+#             flash('投稿が見つかりません', 'danger')
+    
+#     except Exception as e:
+#         flash('メモの更新に失敗しました', 'danger')
+#         print(f"Error updating memo: {str(e)}")
+
+#     return redirect(url_for('index'))
+
+
+@app.route('/post/<string:post_id>/update-memo', methods=['POST'])
+@login_required
+def update_admin_memo(post_id):
+    if not current_user.is_admin:
+        flash('権限がありません', 'danger')
+        return redirect(url_for('index'))
+
+    try:        
+        admin_memo = request.form.get('admin_memo', '')
+        board_table = get_board_table()  # DynamoDBのテーブル取得関数
+
+        # 投稿を取得
+        response = board_table.get_item(
+            Key={
+                'post#post_id': post_id,
+                'user#user_id': current_user.user_id
+            }
+        )
+        item = response.get('Item')
+        if not item:
+            flash('投稿が見つかりません', 'danger')
+            return redirect(url_for('index'))
+
+        # 投稿を更新
+        board_table.update_item(
+            Key={
+                'post#post_id': post_id,
+                'user#user_id': current_user.user_id
+            },
+            UpdateExpression="SET admin_memo = :memo",
+            ExpressionAttributeValues={
+                ':memo': admin_memo
+            }
+        )
+
+        flash('管理者メモを更新しました', 'success')
+        return redirect(url_for('board'))
+
+    except Exception as e:
+        app.logger.error(f"Error updating admin memo: {e}")
+        flash('管理者メモの更新中にエラーが発生しました', 'danger')
+        return redirect(url_for('index'))
 
 
 @app.route('/board/delete/<string:post_id>', methods=['POST'])
