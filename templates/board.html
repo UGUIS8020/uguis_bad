@@ -21,7 +21,7 @@
     
         <div class="mb-3">
             {{ form.content.label(class="form-label") }}
-            {{ form.content(class="form-control", placeholder="内容を入力してください") }}
+            {{ form.content(class="form-control", rows="8", placeholder="内容を入力してください") }}
             {% for error in form.content.errors %}
                 <div class="text-danger">{{ error }}</div>
             {% endfor %}
@@ -30,7 +30,7 @@
         {% if current_user.is_authenticated and current_user.is_admin %}
         <div class="mb-3">
             {{ form.admin_memo.label(class="form-label") }}
-            {{ form.admin_memo(class="form-control", placeholder="管理者用メモを入力してください") }}
+            {{ form.admin_memo(class="form-control", rows="5", placeholder="管理者用メモを入力してください") }}
             {% for error in form.admin_memo.errors %}
                 <div class="text-danger">{{ error }}</div>
             {% endfor %}
