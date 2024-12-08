@@ -31,7 +31,7 @@
         
             <div class="mb-3">
                 {{ form.image.label(class="form-label") }}
-                {{ form.image(class="form-control") }}
+                <input type="file" name="images" id="images" class="form-control" multiple>
                 {% for error in form.image.errors %}
                     <div class="text-danger">{{ error }}</div>
                 {% endfor %}
@@ -61,6 +61,7 @@
                 <div class="card-body">
                     <p class="card-text">{{ post.content }}</p>
                     {% if post.image_url %}
+                    {{ post.image_url }}
                         <img src="{{ post.image_url }}" alt="投稿画像" class="img-fluid mb-3" style="max-width: 400px;">
                     {% endif %}
                 </div>
