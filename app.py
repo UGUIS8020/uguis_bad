@@ -191,8 +191,8 @@ class UpdateUserForm(FlaskForm):
     phone = StringField('電話番号', validators=[DataRequired(), Length(min=10, max=15)])
     post_code = StringField('郵便番号', validators=[DataRequired(), Length(min=7, max=7)])
     address = StringField('住所', validators=[DataRequired(), Length(max=100)])
-    email = StringField('メールアドレス', validators=[DataRequired(), Email()])
-    email_confirm = StringField('メールアドレス(確認)', validators=[DataRequired(), Email(), EqualTo('email', message='メールアドレスが一致していません')])
+    email = StringField('メールアドレス', validators=[DataRequired(), Email()])    
+    email_confirm = StringField('メールアドレス(確認)', validators=[Optional(), Email(), EqualTo('email', message='メールアドレスが一致していません')])
     password = PasswordField('パスワード', validators=[Optional(), Length(min=8), EqualTo('pass_confirm', message='パスワードが一致していません')])
     pass_confirm = PasswordField('パスワード(確認)')
     gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])
@@ -940,10 +940,9 @@ def account(user_id):
             abort(404)
 
         user['user_id'] = user.pop('user#user_id')
+        app.logger.info(f"User loaded successfully: {user_id}")
 
-        form = UpdateUserForm(user_id=user_id, dynamodb_table=app.table)
-        app.logger.debug(f"Form object: {form}")
-        app.logger.debug(f"Form data: {form.data}")
+        form = UpdateUserForm(user_id=user_id, dynamodb_table=app.table)        
         print("あ")
 
         if request.method == 'GET':
@@ -965,9 +964,7 @@ def account(user_id):
         
                                    
         elif form.validate_on_submit():
-            validation_result = form.validate_on_submit()
-            print(f"Validation Result: {validation_result}")
-            app.logger.debug(f"Validation Result: {validation_result}")
+            validation_result = form.validate_on_submit()            
             
             if not validation_result:
                 # エラー内容を詳細に記録
@@ -1185,120 +1182,6 @@ def get_board_table():
     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
     return dynamodb.Table('bad-board-table')
 
-
-# @app.route('/board', methods=['GET', 'POST'])
-
-# def board():
-#     form = Board_Form()
-#     board_table = get_board_table()      
-    
-#     try:
-#         response = board_table.scan()
-#         posts = response.get('Items', [])
-#         print(f"Raw posts from DynamoDB: {posts}")
-
-#         formatted_posts = []
-#         for post in posts:
-#             print(f"Raw post data: {post}")
-
-#             # image_urlのキーの存在確認と、空文字列やNoneの場合の処理
-#             image_url = post.get('image_url')
-#             if image_url is None or image_url == '':
-#                 image_url = ''  # デフォルト値を設定
-
-#             formatted_post = {
-#                 'user#user_id': post.get('user#user_id', ''),
-#                 'post#post_id': post.get('post#post_id', ''),
-#                 'title': post.get('title', ''),
-#                 'content': post.get('content', ''),
-#                 'created_at': post.get('created_at', ''),
-#                 'updated_at': post.get('updated_at', ''),  # 追加
-#                 'image_url': image_url,
-#                 'author_name': post.get('author_name', '名前未設定'),
-#                 'admin_memo': post.get('admin_memo', '')  # 管理者用メモを追加
-#             }
-#             print(f"Formatted post: {formatted_post}")
-#             formatted_posts.append(formatted_post)
-
-#         # formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
-#         # print(f"Retrieved and formatted {len(formatted_posts)} posts")
-
-#         formatted_posts.sort(
-#         key=lambda x: datetime.strptime(x['updated_at'], '%Y-%m-%d %H:%M:%S') if x.get('updated_at') else datetime.strptime(x['created_at'], '%Y-%m-%d %H:%M:%S'),
-#         reverse=True
-# )
-
-#     except Exception as e:
-#         formatted_posts = []
-#         print(f"Error retrieving posts: {str(e)}")
-#         flash(f"データの取得に失敗しました: {str(e)}", "danger")
-
-#     if form.validate_on_submit():
-#         print("Form validated successfully")
-#         try:
-#             image_url = ''  # デフォルト値を空文字列に設定
-#             if form.image.data:
-#                 print(f"Image data detected: {form.image.data}")
-#                 image_file = form.image.data
-
-#                 if not image_file.filename:
-#                     print("No filename provided")
-#                     flash("ファイル名が無効です", "danger")
-#                     return redirect(url_for('board'))
-
-#                 filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
-#                 s3_path = f"board/{filename}"
-#                 print(f"Generated S3 path: {s3_path}")               
-
-#                 try:
-#                     image_file.stream.seek(0)
-#                     app.s3.upload_fileobj(
-#                         image_file.stream,
-#                         app.config['S3_BUCKET'],
-#                         s3_path,
-#                         ExtraArgs={'ContentType': image_file.content_type}
-#                     )
-#                     # S3のURLを確実に生成
-#                     image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
-#                     print(f"Generated image URL: {image_url}")  # URLが生成されたことを確認
-#                 except Exception as e:
-#                     print(f"S3 upload failed: {str(e)}")
-#                     flash(f"画像のアップロードに失敗しました: {str(e)}", "danger")
-#                     return redirect(url_for('board'))
-
-#             print("Preparing data for DynamoDB")
-#             new_post = {
-#                 'user#user_id': current_user.user_id,
-#                 'post#post_id': str(uuid.uuid4()),
-#                 'title': form.title.data,
-#                 'content': form.content.data,
-#                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-#                 'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 追加
-#                 'author_name': current_user.display_name,
-#                 'image_url': image_url  # 空文字列かURLのいずれかが設定される
-#             }
-#             # 管理者の場合、admin_memo を追加
-#             if current_user.is_admin:
-#                 new_post['admin_memo'] = form.admin_memo.data or ''  # フォームに入力がない場合は空文字列を設定
-#             print(f"New post data to save: {new_post}")           
-                
-#             try:
-#                 board_table.put_item(Item=new_post)
-#                 print(f"Post saved to DynamoDB with image_url: {image_url}")
-#             except Exception as e:
-#                 print(f"Error saving post to DynamoDB: {str(e)}")
-#                 flash(f"データの保存に失敗しました: {str(e)}", "danger")
-#                 return redirect(url_for('board'))
-
-#             flash('投稿が成功しました！', 'success')
-#             return redirect(url_for('board'))
-
-#         except Exception as e:
-#             print(f"Unexpected error: {str(e)}")
-#             flash(f"予期しないエラーが発生しました: {str(e)}", "danger")
-#             return redirect(url_for('board'))
-        
-#     return render_template('board.html', form=form, posts=formatted_posts)
 
 @app.route('/board', methods=['GET', 'POST'])
 
