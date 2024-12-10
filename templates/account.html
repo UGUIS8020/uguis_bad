@@ -7,7 +7,7 @@
         <div class="row">
             <div class="col-md-3">
                 <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#del_modal">
-                    削除
+                    ユーザーを削除
                 </button>
             </div>
         </div>
@@ -41,8 +41,8 @@
                 <div class="col-lg-5 mx-auto">
                     <div class="card bg-success text-center">
                         <div class="card-body text-light">
-                            <h3>ユーザー更新</h3>
-                            <p>ユーザー情報を変更してください。</p>
+                            <h3>ユーザー情報</h3>
+                            <p>ユーザー情報を変更出来ます。</p>
                             <form method="POST">
                                 {{ form.hidden_tag() }}
                                 
@@ -101,14 +101,18 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="emergency_phone" class="form-label">メールアドレス</label>
-                                    {{ render_field(form.email, placeholder="メールアドレス", class="form-control form-control-lg") }}
+                                    <label for="email-field" class="form-label">メールアドレス</label>
+                                    <input type="text" id="email-field" name="email" class="form-control form-control-lg" readonly value="{{ form.email.data }}">
                                 </div>
                                 
-                                <div class="mb-3">
-                                    <label for="emergency_phone" class="form-label">メールアドレス(確認)</label>
-                                    {{ render_field(form.email_confirm, placeholder="メールアドレス(確認)", class="form-control form-control-lg") }}
+                                <div class="mb-3" id="email-confirm-field" style="display: none;">
+                                    <label for="email-confirm" class="form-label">メールアドレス(確認)</label>
+                                    <input type="text" id="email-confirm" name="email_confirm" class="form-control form-control-lg">
                                 </div>
+                                
+                                <button type="button" id="edit-email-btn" class="btn btn-primary mb-3">メールアドレスを変更する場合はこちらをクリック</button>
+                                
+                                
                                 
                                 <div class="mb-3">
                                     <label for="emergency_phone" class="form-label">パスワード</label>
@@ -129,6 +133,34 @@
     </div>
     </div>
     </section>
+    
+    <script>
+        document.getElementById('edit-email-btn').addEventListener('click', function() {
+            const emailField = document.getElementById('email-field');
+            const emailConfirmField = document.getElementById('email-confirm-field');
+            const confirmInput = emailConfirmField.querySelector('input');
+            
+            // email欄と確認欄が存在することを確認
+            if (emailField && emailConfirmField) {
+                // email欄を編集可能にする
+                emailField.removeAttribute('readonly');
+        
+                // email確認欄を表示
+                emailConfirmField.style.display = 'block';
+        
+                // 編集モードでない場合は空欄を防ぐ
+                if (!emailField.value) {
+                    emailField.value = '{{ form.email.data }}';  // 初期値を設定
+                }
+        
+                if (confirmInput && !confirmInput.value) {
+                    confirmInput.value = '{{ form.email.data }}';  // 初期値を設定
+                }
+            } else {
+                console.error('メールアドレス欄または確認欄が見つかりません。');
+            }
+        });
+    </script>
  
 
 {% endblock %}
