@@ -138,30 +138,23 @@
         document.getElementById('edit-email-btn').addEventListener('click', function() {
             const emailField = document.getElementById('email-field');
             const emailConfirmField = document.getElementById('email-confirm-field');
+            const confirmInput = emailConfirmField.querySelector('input');
             
             // email欄と確認欄が存在することを確認
             if (emailField && emailConfirmField) {
-                // email欄と確認欄の値をリセット
-                emailField.value = '';
-                const confirmInput = emailConfirmField.querySelector('input');
-                if (confirmInput) {
-                    confirmInput.value = '';
-                }
-    
-                // emailを編集可能にする
+                // email欄を編集可能にする
                 emailField.removeAttribute('readonly');
-    
+        
                 // email確認欄を表示
                 emailConfirmField.style.display = 'block';
-    
-                // hiddenフィールドが既に存在しない場合のみ作成
-                let hiddenReadonlyField = document.querySelector('input[name="email_readonly"]');
-                if (!hiddenReadonlyField) {
-                    hiddenReadonlyField = document.createElement('input');
-                    hiddenReadonlyField.type = 'hidden';
-                    hiddenReadonlyField.name = 'email_readonly';
-                    hiddenReadonlyField.value = 'false';
-                    emailField.form.appendChild(hiddenReadonlyField);
+        
+                // 編集モードでない場合は空欄を防ぐ
+                if (!emailField.value) {
+                    emailField.value = '{{ form.email.data }}';  // 初期値を設定
+                }
+        
+                if (confirmInput && !confirmInput.value) {
+                    confirmInput.value = '{{ form.email.data }}';  // 初期値を設定
                 }
             } else {
                 console.error('メールアドレス欄または確認欄が見つかりません。');
