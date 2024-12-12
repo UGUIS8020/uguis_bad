@@ -254,18 +254,20 @@ class UpdateUserForm(FlaskForm):
 
 
 
+from werkzeug.security import check_password_hash
+
 class User(UserMixin):
-    def __init__(self, user_id, display_name, user_name, furigana, email, password_hash, 
-                 gender, date_of_birth, post_code, address, phone,guardian_name, emergency_phone, 
+    def __init__(self, user_id, display_name, user_name, furigana, email, password_hash,
+                 gender, date_of_birth, post_code, address, phone, guardian_name, emergency_phone, 
                  organization='other', administrator=False, 
                  created_at=None, updated_at=None):
         super().__init__()
-        self.user_id = user_id
+        self.id = user_id
         self.display_name = display_name
         self.user_name = user_name
         self.furigana = furigana
-        self.email = email
-        self.password_hash = password_hash
+        self.email = email 
+        self._password_hash = password_hash
         self.gender = gender
         self.date_of_birth = date_of_birth
         self.post_code = post_code
@@ -278,8 +280,13 @@ class User(UserMixin):
         self.created_at = created_at or datetime.now().isoformat()
         self.updated_at = updated_at or datetime.now().isoformat()
 
-    def get_id(self):
-        return str(self.user_id)
+    def check_password(self, password):
+        return check_password_hash(self._password_hash, password)  # _password_hashを使用
+
+    @property
+    def is_admin(self):
+        return self.administrator    
+   
 
     @staticmethod
     def from_dynamodb_item(item):
@@ -292,15 +299,15 @@ class User(UserMixin):
             user_name=get_value('user_name'),
             furigana=get_value('furigana'),
             email=get_value('email'),
-            password_hash=get_value('password'),
+            password_hash=get_value('password'),  # 修正：password フィールドを取得
             gender=get_value('gender'),
             date_of_birth=get_value('date_of_birth'),
             post_code=get_value('post_code'),
             address=get_value('address'),
             phone=get_value('phone'),
-            guardian_name=get_value('guardian_name', default=None),  # 新しいフィールド
-            emergency_phone=get_value('emergency_phone', default=None),  # 新しいフィールド
-            organization=get_value('organization', default='鶯'),
+            guardian_name=get_value('guardian_name', default=None),
+            emergency_phone=get_value('emergency_phone', default=None),
+            organization=get_value('organization', default='other'),
             administrator=bool(get_value('administrator', False)),
             created_at=get_value('created_at'),
             updated_at=get_value('updated_at')
@@ -315,20 +322,6 @@ class User(UserMixin):
         if self.date_of_birth:
             item['date_of_birth'] = {"S": str(self.date_of_birth)}
         return item
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-    @property
-    def password(self):
-        raise AttributeError('password is not a readable attribute')
-
-    @property
-    def is_admin(self):
-        return self.administrator
 
 
 def get_user_from_dynamodb(user_id):
@@ -380,25 +373,34 @@ class LoginForm(FlaskForm):
             
             items = response.get('Items', [])
             if not items:
-                raise ValidationError('このメールアドレスは登録されていません')
+                raise ValidationError('このメールアドレスは登録されていません')            
             
             # ユーザー情報を保存（パスワード検証で使用）
             self.user = items[0]
-            
+            # ユーザーをロード
+            app.logger.debug(f"User found for email: {field.data}")       
+           
+        
         except Exception as e:
+            app.logger.error(f"Login error: {e}")
             raise ValidationError('ログイン処理中にエラーが発生しました')
 
     def validate_password(self, field):
         """パスワードの検証"""
-        if self.user is None:
+        if not self.user:
             raise ValidationError('先にメールアドレスを確認してください')
-            
-        if not check_password_hash(self.user['password'], field.data):
-            raise ValidationError('パスワードが正しくありません')
 
-    def get_user(self):
-        """ログイン成功時のユーザー情報を返す"""
-        return self.user  
+        stored_hash = self.user.get('password')
+        app.logger.debug(f"Retrieved user: {self.user}")
+        app.logger.debug(f"Stored hash: {stored_hash}")
+        if not stored_hash:
+            app.logger.error("No password hash found in user data")
+            raise ValidationError('登録情報が正しくありません')
+
+        app.logger.debug("Validating password against stored hash")
+        if not check_password_hash(stored_hash, field.data):
+            app.logger.debug("Password validation failed")
+            raise ValidationError('パスワードが正しくありません')
 
 
 class ScheduleForm(FlaskForm):
@@ -520,25 +522,28 @@ def index():
     canonical=url_for('index', _external=True)
     )
 
-@cache.memoize(timeout=0)
+# @cache.memoize(timeout=600)
 def get_schedules_with_formatting():
+    logger.debug("Checking cache for schedules")
+    cache_key = "get_schedules_with_formatting"
+    logger.debug(f"Checking cache for key: {cache_key}")
+
     print("DynamoDBからデータを取得中...")
     schedule_table = get_schedule_table()
     if not schedule_table:
         raise ValueError("Schedule table is not initialized")
 
-    # DynamoDBからスケジュールを取得し、日付をフォーマット
     response = schedule_table.scan()
     schedules = []
     for schedule in response.get('Items', []):
         date_obj = datetime.strptime(schedule['date'], "%Y-%m-%d")
         
-        # 月と日をゼロ埋めしない形式で取得
         formatted_date = f"{date_obj.month}月{date_obj.day}日"
         schedule['formatted_date'] = formatted_date
         
         schedules.append(schedule)
 
+    logger.debug(f"Caching data for key: {cache_key}")
     return schedules
 
 @app.route('/clear-cache')
@@ -569,33 +574,7 @@ def signup():
             if email_check.get('Items'):
                 app.logger.warning(f"Duplicate email registration attempt: {form.email.data}")
                 flash('このメールアドレスは既に登録されています。', 'error')
-                return redirect(url_for('signup'))
-
-            # ユーザーの保存
-            # response = app.dynamodb.put_item(
-            #     TableName=app.table_name,
-            #     Item={                     
-            #         "user#user_id": {"S": user_id},
-            #         "organization": {"S": form.organization.data},  # 所属を追加
-            #         "address": {"S": form.address.data},
-            #         "administrator": {"BOOL": False},
-            #         "created_at": {"S": current_time},
-            #         "date_of_birth": {"S": form.date_of_birth.data.strftime('%Y-%m-%d')},
-            #         "display_name": {"S": form.display_name.data},
-            #         "email": {"S": form.email.data},
-            #         "furigana": {"S": form.furigana.data},
-            #         "gender": {"S": form.gender.data},
-            #         "password": {"S": hashed_password},
-            #         "phone": {"S": form.phone.data},
-            #         "post_code": {"S": form.post_code.data},
-            #         "updated_at": {"S": current_time},
-            #         "user_name": {"S": form.user_name.data},
-            #         "guardian_name": {"S": form.guardian_name.data}, 
-            #         "emergency_phone": {"S": form.emergency_phone.data}
-                    
-            #     },
-            #     ReturnValues="NONE"
-            # )
+                return redirect(url_for('signup'))         
 
             app.table.put_item(
                 Item={
@@ -705,7 +684,6 @@ def login():
                     emergency_phone=user_data.get('emergency_phone', None), 
                     administrator=user_data['administrator']
                 )
-                
                                 
             except KeyError as e:
                 app.logger.error(f"Error creating user object: {str(e)}")
@@ -722,7 +700,7 @@ def login():
                 app.logger.debug(f"Session after login: {session}")  # セッション情報を確認
                 app.logger.info(f"User logged in: {user.get_id()}")
                 app.logger.debug(f"Session data: {session}")                                           
-                app.logger.info(f"User logged in successfully - ID: {user.user_id}, is_authenticated: {current_user.is_authenticated}")
+                app.logger.info(f"User logged in successfully - ID: {user.id}, is_authenticated: {current_user.is_authenticated}")
                 flash('ログインに成功しました。', 'success')
                 
                 next_page = request.args.get('next')
@@ -1284,7 +1262,7 @@ def board():
 
             print("Preparing data for DynamoDB")
             new_post = {
-                'user#user_id': current_user.user_id,
+                'user#user_id': current_user.id,
                 'post#post_id': str(uuid.uuid4()),
                 'title': form.title.data,
                 'content': form.content.data,
@@ -1333,7 +1311,7 @@ def update_admin_memo(post_id):
         response = board_table.get_item(
             Key={
                 'post#post_id': post_id,
-                'user#user_id': current_user.user_id
+                'user#user_id': current_user.id
             }
         )
         item = response.get('Item')
@@ -1345,7 +1323,7 @@ def update_admin_memo(post_id):
         board_table.update_item(
             Key={
                 'post#post_id': post_id,
-                'user#user_id': current_user.user_id
+                'user#user_id': current_user.id
             },
             UpdateExpression="SET admin_memo = :memo",
             ExpressionAttributeValues={
@@ -1371,7 +1349,7 @@ def delete_post(post_id):
         # 最初に投稿データを取得して画像URLを確認
         response = board_table.get_item(
             Key={
-                'user#user_id': current_user.user_id,
+                'user#user_id': current_user.id,
                 'post#post_id': post_id
             }
         )
@@ -1403,7 +1381,7 @@ def delete_post(post_id):
         # DynamoDBから投稿を削除
         board_table.delete_item(
             Key={
-                'user#user_id': current_user.user_id,
+                'user#user_id': current_user.id,
                 'post#post_id': post_id
             }
         )
@@ -1426,7 +1404,7 @@ def edit_post(post_id):
     try:
         # 投稿を取得
         response = board_table.get_item(Key={
-            'user#user_id': current_user.user_id,  # Partition Key
+            'user#user_id': current_user.id,  # Partition Key
             'post#post_id': post_id               # Sort Key
         })
         post = response.get('Item')
@@ -1436,7 +1414,7 @@ def edit_post(post_id):
             return redirect(url_for('board'))
 
         # ユーザー認可の確認
-        if post['user#user_id'] != current_user.user_id:
+        if post['user#user_id'] != current_user.id:
             flash("この投稿を編集する権限がありません", "danger")
             return redirect(url_for('board'))
 
@@ -1482,7 +1460,7 @@ def edit_post(post_id):
             # 投稿を更新
             board_table.update_item(
                 Key={
-                    'user#user_id': current_user.user_id,
+                    'user#user_id': current_user.id,
                     'post#post_id': post_id
                 },
                 UpdateExpression="""SET title = :title, 
