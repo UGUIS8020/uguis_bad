@@ -39,17 +39,7 @@ def create_app():
         load_dotenv()
         
         # Flaskアプリケーションの作成
-        app = Flask(__name__)        
-
-        @app.template_filter('datetimeformat')
-        def datetimeformat(value):
-            try:
-                # ISO形式の日付文字列をdatetimeオブジェクトに変換
-                dt = datetime.fromisoformat(value)
-                # 日本語形式でフォーマット
-                return dt.strftime('%Y年%m月%d日 %H:%M')
-            except ValueError:
-                return value  # 日付文字列でない場合はそのまま返す
+        app = Flask(__name__)               
         
         # Secret Keyの設定
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(24))
