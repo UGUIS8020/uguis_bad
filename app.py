@@ -15,12 +15,13 @@ import uuid
 from datetime import datetime, date
 import io
 from PIL import Image, ExifTags
-from dateutil.relativedelta import relativedelta
+from dateutil import parser, relativedelta
 from botocore.exceptions import ClientError
 import logging
 import time
 import random
 from urllib.parse import urlparse, urljoin
+
 from dotenv import load_dotenv
 
 cache = Cache()
@@ -39,6 +40,16 @@ def create_app():
         
         # Flaskアプリケーションの作成
         app = Flask(__name__)        
+
+        @app.template_filter('datetimeformat')
+        def datetimeformat(value):
+            try:
+                # ISO形式の日付文字列をdatetimeオブジェクトに変換
+                dt = datetime.fromisoformat(value)
+                # 日本語形式でフォーマット
+                return dt.strftime('%Y年%m月%d日 %H:%M')
+            except ValueError:
+                return value  # 日付文字列でない場合はそのまま返す
         
         # Secret Keyの設定
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(24))
@@ -58,7 +69,7 @@ def create_app():
         }
 
         # 必須環境変数のチェック
-        required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET", "TABLE_NAME_USER", "TABLE_NAME_SCHEDULE"]
+        required_env_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_BUCKET", "TABLE_NAME_USER", "TABLE_NAME_SCHEDULE","TABLE_NAME_BOARD"]
         missing_vars = [var for var in required_env_vars if not os.getenv(var)]
         if missing_vars:
             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
@@ -536,7 +547,8 @@ def get_schedules_with_formatting():
     response = schedule_table.scan()
     schedules = []
     for schedule in response.get('Items', []):
-        date_obj = datetime.strptime(schedule['date'], "%Y-%m-%d")
+        # date_obj = datetime.strptime(schedule['date'], "%Y-%m-%d")
+        date_obj = parser.parse(schedule['date'])
         
         formatted_date = f"{date_obj.month}月{date_obj.day}日"
         schedule['formatted_date'] = formatted_date
@@ -1144,13 +1156,25 @@ def delete_image(filename):
         return "Error deleting the image", 500
     
 
+
+
 def get_board_table():
-    dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
-    return dynamodb.Table('bad-board-table')
+    """
+    DynamoDB テーブルを取得する関数。
+    テーブル名とリージョンは環境変数を使用して設定。
+    """
+    # 環境変数からリージョンとテーブル名を取得
+    region = os.getenv('AWS_REGION', 'ap-northeast-1')  # リージョンが未設定の場合、デフォルト値を使用
+    table_name = os.getenv('TABLE_NAME_BOARD')  # テーブル名が未設定の場合、デフォルト値を使用
+
+    # DynamoDBリソースを初期化
+    dynamodb = boto3.resource('dynamodb', region_name=region)
+
+    # テーブルを返す
+    return dynamodb.Table(table_name)
 
 
 @app.route('/board', methods=['GET', 'POST'])
-
 def board():
     form = Board_Form()
     board_table = get_board_table()      
@@ -1164,37 +1188,53 @@ def board():
         for post in posts:
             print(f"Raw post data: {post}")
 
-            # image_urlのキーの存在確認と、空文字列やNoneの場合の処理
-            image_url = post.get('image_url')
-            if image_url is None or image_url == '':
-                image_url = ''  # デフォルト値を設定
+            try:
+                # image_urlのキーの存在確認と、空文字列やNoneの場合の処理
+                image_url = post.get('image_url', '') or ''
 
-            formatted_post = {
-                'user#user_id': post.get('user#user_id', ''),
-                'post#post_id': post.get('post#post_id', ''),
-                'title': post.get('title', ''),
-                'content': post.get('content', ''),
-                'created_at': post.get('created_at', ''),
-                'updated_at': post.get('updated_at', ''),  # 追加
-                'image_url': image_url,
-                'author_name': post.get('author_name', '名前未設定'),
-                'admin_memo': post.get('admin_memo', '')  # 管理者用メモを追加
-            }
-            print(f"Formatted post: {formatted_post}")
-            formatted_posts.append(formatted_post)
+                formatted_post = {
+                    'post_user_id': post.get('post_user_id', ''),
+                    'user#user_id': post.get('user#user_id', ''),
+                    'post#post_id': post.get('post#post_id', ''),
+                    'title': post.get('title', ''),
+                    'content': post.get('content', ''),                   
+                    'created_at': post.get('created_at'),
+                    'updated_at': post.get('updated_at'),
+                    'image_url': image_url,
+                    'author_name': post.get('author_name', '名前未設定'),
+                    'admin_memo': post.get('admin_memo', '')
+                }
+                print(f"Formatted post: {formatted_post}")
+                formatted_posts.append(formatted_post)
 
-        # formatted_posts.sort(key=lambda x: x['created_at'], reverse=True)
-        # print(f"Retrieved and formatted {len(formatted_posts)} posts")
+            except Exception as e:
+                logger.error(f"Error formatting post {post.get('post#post_id')}: {str(e)}")
+                try:
+                    post['created_at_display'] = post.get('created_at', '')
+                    post['updated_at_display'] = post.get('updated_at', '')
+                except:
+                    pass
+                formatted_posts.append(post)
 
+        # ソート用の関数（ループの外で定義）
+        def get_sort_datetime(post):
+            try:
+                sort_date = post.get('updated_at') or post.get('created_at')
+                return datetime.fromisoformat(sort_date)
+            except:
+                return datetime.min
+
+        # 全ての投稿を処理した後でソート
         formatted_posts.sort(
-        key=lambda x: datetime.strptime(x['updated_at'], '%Y-%m-%d %H:%M:%S') if x.get('updated_at') else datetime.strptime(x['created_at'], '%Y-%m-%d %H:%M:%S'),
-        reverse=True
-)
+            key=get_sort_datetime,
+            reverse=True
+        )
 
     except Exception as e:
         formatted_posts = []
-        print(f"Error retrieving posts: {str(e)}")
+        logger.error(f"Error retrieving posts: {str(e)}")
         flash(f"データの取得に失敗しました: {str(e)}", "danger")
+    
 
     if form.validate_on_submit():
         print("Form validated successfully")
@@ -1261,15 +1301,24 @@ def board():
                     return redirect(url_for('board'))
 
             print("Preparing data for DynamoDB")
+            post_id = str(uuid.uuid4())  # 一意の投稿IDを生成
+            updated_at = datetime.now().isoformat()  # 現在時刻を取得
+
+            # ソートキーとして使用する post_updated_key を生成
+            post_updated_key = f"{post_id}#{updated_at}"
+            # post_user_id を生成
+            post_user_id = f"{current_user.id}_{post_id}"
+
             new_post = {
-                'user#user_id': current_user.id,
-                'post#post_id': str(uuid.uuid4()),
-                'title': form.title.data,
-                'content': form.content.data,
-                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 追加
-                'author_name': current_user.display_name,
-                'image_url': image_url  # 空文字列かURLのいずれかが設定される
+                'post_user_id': post_user_id,  # パーティションキー
+                'updated_at': updated_at,  # ソートキーとして更新日時を使用
+                'post#post_id': post_id,  # 一意の投稿ID
+                'user#user_id': current_user.id,  # ユーザーID（補助的な情報）
+                'title': form.title.data,  # 投稿タイトル
+                'content': form.content.data,  # 投稿内容
+                'created_at': updated_at,  # 作成日時
+                'author_name': current_user.display_name,  # 投稿者名
+                'image_url': image_url  # 画像URL
             }
             # 管理者の場合、admin_memo を追加
             if current_user.is_admin:
@@ -1277,15 +1326,17 @@ def board():
             print(f"New post data to save: {new_post}")           
                 
             try:
-                board_table.put_item(Item=new_post)
+                # DynamoDBにデータを保存
+                board_table.put_item(Item=new_post)  # 必要なキー構造に合わせたデータを保存
                 print(f"Post saved to DynamoDB with image_url: {image_url}")
+                flash('投稿が成功しました！', 'success')
+                return redirect(url_for('board'))
+
             except Exception as e:
+                # DynamoDBの保存中にエラーが発生した場合
                 print(f"Error saving post to DynamoDB: {str(e)}")
                 flash(f"データの保存に失敗しました: {str(e)}", "danger")
                 return redirect(url_for('board'))
-
-            flash('投稿が成功しました！', 'success')
-            return redirect(url_for('board'))
 
         except Exception as e:
             print(f"Unexpected error: {str(e)}")
@@ -1296,34 +1347,42 @@ def board():
 
 
 
-@app.route('/post/<string:post_id>/update-memo', methods=['POST'])
+@app.route('/post/<string:post_user_id>/update-memo', methods=['POST'])
 @login_required
-def update_admin_memo(post_id):
-    if not current_user.is_admin:
-        flash('権限がありません', 'danger')
-        return redirect(url_for('index'))
+def update_admin_memo(post_user_id):
+    try:
+        updated_at = request.form.get('updated_at', None)
+        admin_memo = request.form.get('admin_memo', '').strip()
 
-    try:        
-        admin_memo = request.form.get('admin_memo', '')
-        board_table = get_board_table()  # DynamoDBのテーブル取得関数
+        # ログでデバッグ
+        app.logger.debug(f"Received post_user_id: {post_user_id}")
+        app.logger.debug(f"Received updated_at: {updated_at}")
+        app.logger.debug(f"Received admin_memo: {admin_memo}")
 
-        # 投稿を取得
+        if not updated_at:
+            flash('更新日時が指定されていません', 'danger')
+            return redirect(url_for('board'))
+
+        board_table = get_board_table()  # DynamoDBテーブル取得関数
+
+        # DynamoDBから投稿を取得
         response = board_table.get_item(
             Key={
-                'post#post_id': post_id,
-                'user#user_id': current_user.id
+                'post_user_id': post_user_id,
+                'updated_at': updated_at
             }
         )
         item = response.get('Item')
+
         if not item:
             flash('投稿が見つかりません', 'danger')
-            return redirect(url_for('index'))
+            return redirect(url_for('board'))
 
-        # 投稿を更新
+        # DynamoDBで投稿を更新
         board_table.update_item(
             Key={
-                'post#post_id': post_id,
-                'user#user_id': current_user.id
+                'post_user_id': post_user_id,
+                'updated_at': updated_at
             },
             UpdateExpression="SET admin_memo = :memo",
             ExpressionAttributeValues={
@@ -1337,155 +1396,146 @@ def update_admin_memo(post_id):
     except Exception as e:
         app.logger.error(f"Error updating admin memo: {e}")
         flash('管理者メモの更新中にエラーが発生しました', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('board'))
 
 
-@app.route('/board/delete/<string:post_id>', methods=['POST'])
+@app.route('/board/delete/<string:post_user_id>', methods=['POST'])
 @login_required
-def delete_post(post_id):
+def delete_post(post_user_id):
     board_table = get_board_table()
+    updated_at = request.form.get('updated_at')  # 更新日時をフォームから取得
+
+    if not updated_at:
+        flash("更新日時が指定されていません", "danger")
+        return redirect(url_for('board'))
+
+    logger.info(f"Deleting post: {post_user_id}, updated_at: {updated_at}")
 
     try:
-        # 最初に投稿データを取得して画像URLを確認
+        # 投稿を取得
         response = board_table.get_item(
             Key={
-                'user#user_id': current_user.id,
-                'post#post_id': post_id
+                'post_user_id': post_user_id,
+                'updated_at': updated_at
             }
         )
-        
+
         if 'Item' not in response:
+            logger.error(f"Post not found: post_user_id={post_user_id}, updated_at={updated_at}")
             flash("投稿が見つかりませんでした", "danger")
             return redirect(url_for('board'))
-            
+
         post = response['Item']
+
+        # ユーザーの権限を確認
+        if post['user#user_id'] != current_user.id:
+            logger.error(f"Permission denied. User: {current_user.id}, Post owner: {post['user#user_id']}")
+            flash("この投稿を削除する権限がありません", "danger")
+            return redirect(url_for('board'))
+
+        # 画像の削除
         image_url = post.get('image_url')
-        
-        # S3から画像を削除（画像URLが存在する場合）
-        if image_url and image_url.strip():
+        if image_url:
             try:
-                # S3のパスを抽出 (https://bucket-name.s3.amazonaws.com/path/to/file から path/to/file を取得)
                 s3_path = image_url.split('.com/')[-1]
-                print(f"Attempting to delete S3 object: {s3_path}")
-                
-                app.s3.delete_object(
-                    Bucket=app.config['S3_BUCKET'],
-                    Key=s3_path
-                )
-                print(f"Successfully deleted S3 object: {s3_path}")
+                app.s3.delete_object(Bucket=app.config['S3_BUCKET'], Key=s3_path)
+                logger.info(f"Image deleted successfully: {s3_path}")
             except Exception as e:
-                print(f"Error deleting S3 object: {str(e)}")
-                # S3削除のエラーはユーザーに通知するが、処理は続行
-                flash(f"画像の削除中にエラーが発生しました: {str(e)}", "warning")
-        
-        # DynamoDBから投稿を削除
+                logger.error(f"Failed to delete image: {e}")
+
+        # 投稿の削除
         board_table.delete_item(
             Key={
-                'user#user_id': current_user.id,
-                'post#post_id': post_id
+                'post_user_id': post_user_id,
+                'updated_at': updated_at
             }
         )
-        
-        print(f"Successfully deleted post and associated image")
-        flash("投稿が削除されました", "success")
-        
+        logger.info(f"Post deleted successfully: {post_user_id}, updated_at: {updated_at}")
+        flash("投稿を削除しました", "success")
+
     except Exception as e:
-        print(f"Error in delete_post: {str(e)}")
-        flash(f"投稿の削除に失敗しました: {str(e)}", "danger")
+        logger.error(f"Delete failed: {e}")
+        flash("削除中にエラーが発生しました", "danger")
 
     return redirect(url_for('board'))
 
 
-@app.route('/board/edit/<string:post_id>', methods=['GET', 'POST'])
-def edit_post(post_id):
-    form = Board_Form()
-    board_table = get_board_table()
-
-    try:
-        # 投稿を取得
-        response = board_table.get_item(Key={
-            'user#user_id': current_user.id,  # Partition Key
-            'post#post_id': post_id               # Sort Key
-        })
-        post = response.get('Item')
-
-        if not post:
-            flash("投稿が見つかりません", "danger")
-            return redirect(url_for('board'))
-
-        # ユーザー認可の確認
-        if post['user#user_id'] != current_user.id:
-            flash("この投稿を編集する権限がありません", "danger")
-            return redirect(url_for('board'))
-
-        if request.method == 'POST' and form.validate_on_submit():
-            updated_post = {
-                'title': form.title.data,
-                'content': form.content.data,
-                'author_name': current_user.display_name,
-            }
-
-            # 画像の処理
-            image_url = post.get('image_url', None)
-
-            # 画像削除
-            if form.remove_image.data and image_url:
-                try:
-                    s3_path = image_url.split(f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/")[1]
-                    app.s3.delete_object(Bucket=app.config['S3_BUCKET'], Key=s3_path)
-                    image_url = None
-                except Exception as e:
-                    flash(f"画像の削除に失敗しました: {str(e)}", "danger")
-
-            # 新しい画像をアップロード
-            if form.image.data:
-                try:
-                    image_file = form.image.data
-                    filename = secure_filename(f"{uuid.uuid4()}_{image_file.filename}")
-                    s3_path = f"board/{filename}"
-                    image_file.stream.seek(0)
-                    app.s3.upload_fileobj(
-                        image_file.stream,
-                        app.config['S3_BUCKET'],
-                        s3_path,
-                        ExtraArgs={'ContentType': image_file.content_type}
-                    )
-                    image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{s3_path}"
-                except Exception as e:
-                    flash(f"画像のアップロードに失敗しました: {str(e)}", "danger")
-                    return redirect(url_for('edit_post', post_id=post_id))
-
-            updated_post['image_url'] = image_url
-
-            # 投稿を更新
-            board_table.update_item(
-                Key={
-                    'user#user_id': current_user.id,
-                    'post#post_id': post_id
-                },
-                UpdateExpression="""SET title = :title, 
-                                     content = :content, 
-                                     author_name = :author_name, 
-                                     image_url = :image_url""",
-                ExpressionAttributeValues={
-                    ':title': updated_post['title'],
-                    ':content': updated_post['content'],
-                    ':author_name': updated_post['author_name'],
-                    ':image_url': updated_post['image_url'],
-                }
-            )
-
-            flash("投稿が更新されました", "success")
-            return redirect(url_for('board'))
-
-        form.title.data = post.get('title', '')
-        form.content.data = post.get('content', '')
-
-    except Exception as e:
-        flash(f"投稿の編集に失敗しました: {str(e)}", "danger")
+@app.route('/board/edit/<string:post_user_id>', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_user_id):
+    # リクエストパラメータからupdated_atを取得
+    updated_at = request.args.get('updated_at')
+    if not updated_at:
+        print("Error: updated_at is missing from the request.")
+        flash('更新日時が指定されていません', 'danger')
         return redirect(url_for('board'))
 
-    return render_template('edit_post.html', form=form, post=post)
+    try:
+        print(f"Editing post with post_user_id: {post_user_id}, updated_at: {updated_at}")
+        board_table = get_board_table()
+        form = Board_Form()
+
+        # DynamoDB から投稿を取得
+        response = board_table.get_item(
+            Key={
+                'post_user_id': post_user_id,
+                'updated_at': updated_at
+            }
+        )
+        if 'Item' not in response:
+            print("Post not found.")
+            flash('投稿が見つかりませんでした', 'danger')
+            return redirect(url_for('board'))
+
+        post = response['Item']
+        print(f"Fetched post: {post}")
+
+        # 投稿者本人かチェック
+        if post['user#user_id'] != current_user.id:
+            print(f"Permission denied. Post user: {post['user#user_id']}, Current user: {current_user.id}")
+            flash('この投稿を編集する権限がありません', 'danger')
+            return redirect(url_for('board'))
+
+        # 編集ロジック
+        if form.validate_on_submit():
+            new_updated_at = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+
+            # 新しい項目を作成
+            new_post = post.copy()
+            new_post['title'] = form.title.data
+            new_post['content'] = form.content.data
+            new_post['updated_at'] = new_updated_at
+            if current_user.is_admin and form.admin_memo.data:
+                new_post['admin_memo'] = form.admin_memo.data
+
+            # 古い項目を削除
+            board_table.delete_item(
+                Key={
+                    'post_user_id': post_user_id,
+                    'updated_at': updated_at
+                }
+            )
+            print("Old item deleted.")
+
+            # 新しい項目を挿入
+            board_table.put_item(Item=new_post)
+            print(f"New item created: {new_post}")
+
+            flash('投稿を更新しました', 'success')
+            return redirect(url_for('board'))
+
+        # GETリクエスト時、フォームにデータを設定
+        form.title.data = post.get('title', '')
+        form.content.data = post.get('content', '')
+        if current_user.is_admin:
+            form.admin_memo.data = post.get('admin_memo', '')
+
+        return render_template('edit_post.html', form=form, post=post)
+
+    except Exception as e:
+        print(f"Exception in edit_post: {e}")
+        flash(f"エラーが発生しました: {e}", 'danger')
+        return redirect(url_for('board'))
     
     
 @app.route("/uguis2024_tournament")
