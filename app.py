@@ -1349,6 +1349,7 @@ def board():
 @login_required
 def update_admin_memo(post_user_id):
     try:
+        print("か")
         updated_at = request.form.get('updated_at', None)
         admin_memo = request.form.get('admin_memo', '').strip()
 
