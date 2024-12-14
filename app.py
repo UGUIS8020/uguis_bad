@@ -523,7 +523,7 @@ def index():
     canonical=url_for('index', _external=True)
     )
 
-# @cache.memoize(timeout=600)
+@cache.memoize(timeout=1800)
 def get_schedules_with_formatting():
     logger.debug("Checking cache for schedules")
     cache_key = "get_schedules_with_formatting"
