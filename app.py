@@ -107,6 +107,14 @@ app = create_app()
 def tokyo_time():
     return datetime.now(pytz.timezone('Asia/Tokyo'))
 
+@app.context_processor
+def inject_canonical_url():
+    """
+    テンプレートにカノニカルURLを提供する
+    """
+    canonical_url = request.base_url  # クエリパラメータを除外したURLを取得
+    return dict(canonical_url=canonical_url)
+
 
 @login_manager.user_loader
 def load_user(user_id):
