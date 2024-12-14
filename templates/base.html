@@ -17,17 +17,18 @@
    
     
     <!-- タイトルタグの最適化 -->
-    <title>鶯 | 越谷市バドミントンサークル</title>
+    <title>{% block title %}鶯 | 越谷市バドミントンサークル{% endblock %}</title>
+    <meta name="description" content="{% block description %}越谷市で活動しているバドミントンサークルです。新規参加者募集中です{% endblock %}">
+    <!-- カノニカルタグを設定 -->
+    <link rel="canonical" href="{{ canonical_url }}">  
     
-    <!-- メタディスクリプションの改善 -->
-    <meta name="description" content="越谷市の社会人バドミントンサークル「鶯 バドミントン」では、初心者から経験者まで大歓迎！北越谷体育館で活動中。1回700円～、楽しくバドミントンを始めませんか？">
-    
+        
     <!-- キーワードの最適化 -->
     <meta name="keywords" content="越谷市バドミントン,社会人サークル,北越谷,初心者歓迎,バドミントン教室,埼玉県,スポーツサークル,運動,健康,趣味,バドミントンコート,練習会,体験募集">
     
     <!-- ソーシャルメディア用メタタグの強化 -->
-    <meta property="og:title" content="鶯 | 越谷市バドミントンサークル">
-    <meta property="og:description" content="越谷市の社会人バドミントンサークル">
+    <meta property="og:title" content="{{ self.title() }}">
+    <meta property="og:description" content="{{ self.description() }}">
     <meta property="og:image" content="https://uguis-bad.onrender.com/images/001.jpg">
     <meta property="og:url" content="https://uguis-bad.onrender.com/">
     <meta property="og:type" content="website">
