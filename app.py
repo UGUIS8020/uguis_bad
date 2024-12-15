@@ -262,8 +262,113 @@ class UpdateUserForm(FlaskForm):
             raise ValidationError('予期しないエラーが発生しました。管理者にお問い合わせください。')
 
 
+class TempRegistrationForm(FlaskForm):
+    # 表示名
+    display_name = StringField(
+        '表示名', 
+        validators=[
+            DataRequired(message='表示名を入力してください'),
+            Length(min=1, max=30, message='表示名は1文字以上30文字以下で入力してください')
+        ]
+    )
 
-from werkzeug.security import check_password_hash
+    # 名前
+    user_name = StringField(
+        '名前',
+        validators=[
+            DataRequired(message='名前を入力してください'),
+            Length(min=1, max=30, message='名前は1文字以上30文字以下で入力してください')
+        ]
+    )
+    
+    # 性別
+    gender = SelectField(
+        '性別', 
+        choices=[
+            ('', '性別を選択してください'),
+            ('male', '男性'),
+            ('female', '女性')
+        ], 
+        validators=[
+            DataRequired(message='性別を選択してください')
+        ]
+    )
+    
+    # バドミントン歴
+    badminton_experience = SelectField(
+        'バドミントン歴', 
+        choices=[
+            ('', 'バドミントン歴を選択してください'),
+            ('no_experience', '未経験者'),
+            ('less_than_1_year', '1年未満'),
+            ('1_to_3_years', '1年以上～3年未満'),
+            ('more_than_3_years', '3年以上')
+        ], 
+        validators=[
+            DataRequired(message='バドミントン歴を選択してください')
+        ]
+    )
+    
+    # メールアドレス
+    email = StringField(
+        'メールアドレス', 
+        validators=[
+            DataRequired(message='メールアドレスを入力してください'),
+            Email(message='正しいメールアドレスを入力してください')
+        ]
+    )
+    
+    # パスワード
+    password = PasswordField(
+        'パスワード', 
+        validators=[
+            DataRequired(message='パスワードを入力してください'),
+            Length(min=8, message='パスワードは8文字以上で入力してください')
+        ]
+    )
+    
+    # 登録ボタン
+    submit = SubmitField('仮登録')
+
+
+@app.route('/temp_register', methods=['GET', 'POST'])
+def temp_register():
+    form = TempRegistrationForm()
+    if form.validate_on_submit():
+        try:
+            current_time = datetime.now().isoformat()  # UTCで統一
+            hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256')
+            user_id = str(uuid.uuid4())
+
+            table = app.dynamodb.Table(app.table_name)
+
+            temp_data = {
+                "user#user_id": user_id,
+                "display_name": form.display_name.data,
+                "user_name": form.user_name.data,
+                "gender": form.gender.data,
+                "badminton_experience": form.badminton_experience.data,
+                "email": form.email.data,
+                "password": hashed_password,
+                "organization": "仮登録",
+                "created_at": current_time,
+                "administrator": False
+            }
+
+            # DynamoDBに保存
+            table.put_item(Item=temp_data)
+
+            # 仮登録成功後、ログインページにリダイレクト
+            flash("仮登録が完了しました。ログインしてください。", "success")
+            return redirect(url_for('login'))
+
+        except Exception as e:
+            logger.error(f"DynamoDBへの登録中にエラーが発生しました: {e}", exc_info=True)
+            flash(f"登録中にエラーが発生しました: {str(e)}", 'danger')
+
+    return render_template('temp_register.html', form=form) 
+
+
 
 class User(UserMixin):
     def __init__(self, user_id, display_name, user_name, furigana, email, password_hash,
@@ -438,15 +543,6 @@ class ScheduleForm(FlaskForm):
     
     submit = SubmitField('登録')
 
-
-# class Board_Form(FlaskForm):
-#     title = StringField('タイトル', validators=[DataRequired()])
-#     content = TextAreaField('内容', validators=[DataRequired()])
-#     image = FileField('ファイル', validators=[
-#     FileAllowed(['jpg', 'png', 'gif', 'pdf'], 'jpg, png, gif, pdfのみアップロード可能です。')])
-#     remove_image = BooleanField('画像を削除する')  # チェックボックスで画像削除を選択可能に
-#     submit = SubmitField('投稿する')
-
 class Board_Form(FlaskForm):
     title = StringField('タイトル', 
         validators=[
@@ -555,6 +651,15 @@ def get_schedules_with_formatting():
 
     logger.debug(f"Caching data for key: {cache_key}")
     return schedules
+
+@app.template_filter('format_date')
+def format_date(value):
+    """日付を 'MM/DD' 形式にフォーマット"""
+    try:
+        date_obj = datetime.fromisoformat(value)  # ISO 形式から日付オブジェクトに変換
+        return date_obj.strftime('%m/%d')        # MM/DD フォーマットに変換
+    except ValueError:
+        return value  # 変換できない場合はそのまま返す
 
 @app.route('/clear-cache')
 def clear_cache():
@@ -682,14 +787,14 @@ def login():
                     user_id=user_data['user#user_id'],
                     display_name=user_data['display_name'],
                     user_name=user_data['user_name'],
-                    furigana=user_data['furigana'],
+                    furigana=user_data.get('furigana', None),
                     email=user_data['email'],
                     password_hash=user_data['password'],
                     gender=user_data['gender'],
-                    date_of_birth=user_data['date_of_birth'],
-                    post_code=user_data['post_code'],
-                    address=user_data['address'],
-                    phone=user_data['phone'],
+                    date_of_birth=user_data.get('date_of_birth', None),
+                    post_code=user_data.get('post_code', None),
+                    address=user_data.get('address',None),
+                    phone=user_data.get('phone', None),
                     guardian_name=user_data.get('guardian_name', None),  
                     emergency_phone=user_data.get('emergency_phone', None), 
                     administrator=user_data['administrator']
@@ -1180,7 +1285,9 @@ def board():
     try:
         response = board_table.scan()
         posts = response.get('Items', [])
-        print(f"Raw posts from DynamoDB: {posts}")
+        
+        # 更新日時でソート（降順）
+        posts.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
 
         formatted_posts = []
         for post in posts:
@@ -1221,12 +1328,7 @@ def board():
                 return datetime.fromisoformat(sort_date)
             except:
                 return datetime.min
-
-        # 全ての投稿を処理した後でソート
-        formatted_posts.sort(
-            key=get_sort_datetime,
-            reverse=True
-        )
+        
 
     except Exception as e:
         formatted_posts = []
@@ -1497,31 +1599,38 @@ def edit_post(post_user_id):
 
         # 編集ロジック
         if form.validate_on_submit():
-            new_updated_at = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            new_updated_at = datetime.now(pytz.timezone('Asia/Tokyo')).isoformat()
 
             # 新しい項目を作成
             new_post = post.copy()
             new_post['title'] = form.title.data
             new_post['content'] = form.content.data
             new_post['updated_at'] = new_updated_at
-            if current_user.is_admin and form.admin_memo.data:
-                new_post['admin_memo'] = form.admin_memo.data
 
-            # 古い項目を削除
-            board_table.delete_item(
-                Key={
-                    'post_user_id': post_user_id,
-                    'updated_at': updated_at
-                }
-            )
-            print("Old item deleted.")
+            if current_user.is_admin:
+                new_post['admin_memo'] = form.admin_memo.data or ''  # None の場合は空文字列を設定
 
-            # 新しい項目を挿入
-            board_table.put_item(Item=new_post)
-            print(f"New item created: {new_post}")
+            try:
+                # トランザクションで更新処理を実行
+                with board_table.batch_writer() as batch:
+                    # 古い項目を削除
+                    batch.delete_item(
+                        Key={
+                            'post_user_id': post_user_id,
+                            'updated_at': updated_at
+                        }
+                    )
+                    # 新しい項目を追加
+                    batch.put_item(Item=new_post)
 
-            flash('投稿を更新しました', 'success')
-            return redirect(url_for('board'))
+                print(f"Post updated successfully. New updated_at: {new_updated_at}")
+                flash('投稿を更新しました', 'success')
+                return redirect(url_for('board'))
+
+            except Exception as e:
+                print(f"Failed to update post: {e}")
+                flash('投稿の更新に失敗しました', 'danger')
+                return redirect(url_for('board'))
 
         # GETリクエスト時、フォームにデータを設定
         form.title.data = post.get('title', '')
