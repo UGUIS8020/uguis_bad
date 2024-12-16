@@ -369,6 +369,50 @@ def temp_register():
     return render_template('temp_register.html', form=form) 
 
 
+@app.route('/schedule/<string:schedule_id>/join', methods=['POST'])
+@login_required
+def join_schedule(schedule_id):
+    try:
+        venue_date = request.form.get('venue_date')
+        if not venue_date:
+            flash("会場情報が見つかりません。", "danger")
+            return redirect(url_for('index'))
+
+        # DynamoDBから該当のスケジュールを取得
+        schedule_table = get_schedule_table()
+        response = schedule_table.get_item(
+            Key={
+                'venue_date': venue_date,
+                'schedule_id': schedule_id
+            }
+        )
+
+        schedule = response.get('Item')
+        if not schedule:
+            flash("スケジュールが見つかりません。", "danger")
+            return redirect(url_for('index'))
+
+        # 参加者リストに現在のユーザーIDを追加
+        participants = schedule.get('participants', [])
+        if current_user.id not in participants:
+            participants.append(current_user.id)
+            schedule_table.update_item(
+                Key={
+                    'venue_date': venue_date,
+                    'schedule_id': schedule_id
+                },
+                UpdateExpression="SET participants = :participants",
+                ExpressionAttributeValues={':participants': participants}
+            )
+            flash("参加登録が完了しました！", "success")
+
+        return redirect(url_for('index'))  # リロードしてテンプレートを再描画
+
+    except Exception as e:
+        app.logger.error(f"Error joining schedule: {e}", exc_info=True)
+        flash("エラーが発生しました。", "danger")
+        return redirect(url_for('index'))
+
 
 class User(UserMixin):
     def __init__(self, user_id, display_name, user_name, furigana, email, password_hash,
@@ -580,6 +624,7 @@ class Board_Form(FlaskForm):
 def get_schedule_table():
     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
     return dynamodb.Table('Schedule')
+
 
 @app.route("/", methods=['GET', 'POST'])
 def index():

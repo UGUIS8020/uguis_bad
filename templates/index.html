@@ -66,10 +66,23 @@
                             
                             <!-- 参加ボタンを追加 -->
                             <td>
-                                <button class="btn btn-primary btn-sm {% if not current_user.is_authenticated %}btn-secondary disabled{% endif %}" 
-                                        {% if not current_user.is_authenticated %}disabled{% endif %}>
-                                    参加する
-                                </button>
+                                <form action="{{ url_for('join_schedule', schedule_id=schedule.schedule_id) }}" method="post">
+                                    <input type="hidden" name="venue_date" value="{{ schedule.venue }}#{{ schedule.date }}">
+                            
+                                    <button class="btn btn-sm 
+                                                   {% if not current_user.is_authenticated or current_user.id in schedule.participants %}
+                                                       btn-danger
+                                                   {% else %}
+                                                       btn-primary 
+                                                   {% endif %}" 
+                                            {% if not current_user.is_authenticated or current_user.id in schedule.participants %}disabled{% endif %}>
+                                        {% if current_user.is_authenticated and current_user.id in schedule.participants %}
+                                            参加済み
+                                        {% else %}
+                                            参加する
+                                        {% endif %}
+                                    </button>
+                                </form>
                             </td>
                             
                             {% if current_user.is_authenticated and current_user.is_admin %}
