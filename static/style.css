@@ -58,17 +58,16 @@
 }
 
 
-.form-container {
-  border: 2px solid #007bff; /* 枠線の色 */
-  border-radius: 10px; /* 角丸 */
-  padding: 20px; /* 内側の余白 */
-  background-color: #ffffff; /* 背景色 */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* シャドウ */
+.btn-danger-custom {
+  background-color: #b00020; /* 濃い赤 */
+  border-color: #900018;    /* 境界線の色 */
+  color: #ffffff;           /* 文字色を白に固定 */
 }
 
-.btn-disabled {
-  background-color: #d6d6d6; /* 灰色の背景 */
-  color: #8a8a8a; /* 灰色の文字 */
-  cursor: not-allowed; /* ポインターを無効状態に */
-  opacity: 0.65; /* 少し透明に見せる */
+.btn-danger-custom:disabled {
+  background-color: #900018; /* 無効時も濃い赤 */
+  border-color: #700014;    /* 境界線の色 */
+  color: #ffffff;           /* 無効状態でも文字色を白に固定 */
+  opacity: 1;               /* disabled のデフォルトの透明度を無効化 */
+  pointer-events: none;     /* クリックを無効化 */
 }
