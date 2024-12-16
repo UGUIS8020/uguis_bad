@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}index{% endblock %}
+{% block title %}鶯 | 越谷市バドミントンサークル{% endblock %}
 {% block content %}      
 <section id="about" class="mt-3 mb-3 text-center">
     <h2 class="mb-3">バドミントンメンバー募集</h2>
@@ -31,7 +31,14 @@
     <div class="container">       
         <section id="schedule" class="mb-5">                        
               <div class="schedule text-center">
-                <h1>練習予定</h1>                      
+                <h1>練習予定</h1>          
+                 <!-- ログインしていない場合、仮登録案内を表示 -->
+            {% if not current_user.is_authenticated %}
+            <div class="mt-3">
+                <p>練習に参加するには仮登録をしてください。
+                <a href="{{ url_for('temp_register') }}" class="btn btn-warning">仮登録へ</a></p>
+            </div>
+            {% endif %}            
                 
                 <table class="table table-striped">              
                       
@@ -42,23 +49,43 @@
                             <th>曜日</th>
                             <th>開始</th>
                             <th>終了</th>
-                            <th>会場</th>                           
+                            <th>会場</th>
+                            <th>参加(テスト中未稼働)</th>                         
                             
                         </tr>
                     </thead>
                     <tbody>
                         {% for schedule in schedules %}
                         <tr>
-                            <td>{{ schedule.formatted_date }}</td>
+                            
+                            <td>{{ schedule.date | format_date }}</td>
                             <td>{{ schedule.day_of_week }}</td>
                             <td>{{ schedule.start_time }}</td>
                             <td>{{ schedule.end_time }}</td>
                             <td>{{ schedule.venue }}</td>  
-
                             
+                            <!-- 参加ボタンを追加 -->
+                            <td>
+                                <form action="{{ url_for('join_schedule', schedule_id=schedule.schedule_id) }}" method="post">
+                                    <input type="hidden" name="venue_date" value="{{ schedule.venue }}#{{ schedule.date }}">
+                            
+                                    <button class="btn btn-sm 
+                                                   {% if not current_user.is_authenticated or current_user.id in schedule.participants %}
+                                                       btn-danger
+                                                   {% else %}
+                                                       btn-primary 
+                                                   {% endif %}" 
+                                            {% if not current_user.is_authenticated or current_user.id in schedule.participants %}disabled{% endif %}>
+                                        {% if current_user.is_authenticated and current_user.id in schedule.participants %}
+                                            参加済み
+                                        {% else %}
+                                            参加する
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </td>
                             
                             {% if current_user.is_authenticated and current_user.is_admin %}
-                            
                             <td>
                                 <a href="{{ url_for('edit_schedule', schedule_id=schedule.schedule_id) }}" class="btn btn-secondary">変更</a>
                             </td>

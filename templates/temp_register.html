@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}仮登録{% endblock %}
+{% block content %}
+<section id="temp-register">
+    <div class="container my-5">
+        <div class="row">
+            <div class="col-lg-6 mx-auto">
+                <div class="card text-center" style="background-color: #8ea604; border-color: #647503;">
+                    <div class="card-body text-light">
+                        <h3>仮登録フォーム</h3>
+                        <p>必要事項を入力してください。</p>
+                        <form method="POST" action="">
+                            {{ form.hidden_tag() }}
+
+                            <!-- 表示名 -->
+                            <div class="mb-3">
+                                {{ render_field(form.display_name, placeholder="表示名(例: LINE名など)", class="form-control form-control-lg") }}
+                                {% if form.display_name.errors %}
+                                    <p class="text-danger">{{ form.display_name.errors[0] }}</p>
+                                {% endif %}
+                            </div>
+                           
+                             <!-- 名前 -->
+                             <div class="mb-3">
+                                {{ render_field(form.user_name, placeholder="氏名", class="form-control form-control-lg") }}
+                                {% if form.user_name.errors %}
+                                    <p class="text-danger">{{ form.user_name.errors[0] }}</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- 性別 -->
+                            <div class="mb-3">
+                                {{ render_field(form.gender, class="form-control form-control-lg") }}
+                                {% if form.gender.errors %}
+                                    <p class="text-danger">{{ form.gender.errors[0] }}</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- バドミントン歴 -->
+                            <div class="mb-3">
+                                {{ render_field(form.badminton_experience, placeholder="バドミントン経験年数・レベルなど", class="form-control form-control-lg") }}
+                                {% if form.badminton_experience.errors %}
+                                    <p class="text-danger">{{ form.badminton_experience.errors[0] }}</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- メールアドレス -->
+                            <div class="mb-3">
+                                {{ render_field(form.email, placeholder="メールアドレス", class="form-control form-control-lg") }}
+                                {% if form.email.errors %}
+                                    <p class="text-danger">{{ form.email.errors[0] }}</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- パスワード -->
+                            <div class="mb-3">
+                                {{ render_field(form.password, placeholder="パスワード(8文字以上)", class="form-control form-control-lg") }}
+                                {% if form.password.errors %}
+                                    <p class="text-danger">{{ form.password.errors[0] }}</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- 登録ボタン -->
+                            <div>
+                                {{ form.submit(class="btn btn-outline-light w-100") }}
+                            </div>
+
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
