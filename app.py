@@ -913,6 +913,7 @@ def get_schedule_table():
 
 @app.route("/edit_schedule/<schedule_id>", methods=['GET', 'POST'])
 def edit_schedule(schedule_id):
+    logging.debug(f"Fetching schedule for ID: {schedule_id}")
     form = ScheduleForm()
     table = get_schedule_table()
 
