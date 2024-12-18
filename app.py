@@ -1,7 +1,6 @@
-from flask import Flask
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from flask import render_template, request, redirect, url_for, flash, abort, session
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, session, jsonify
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from wtforms import ValidationError, StringField,  TextAreaField, PasswordField, SubmitField, SelectField, DateField, BooleanField
@@ -368,6 +367,15 @@ def temp_register():
 
     return render_template('temp_register.html', form=form) 
 
+def get_participation_table():
+    """参加データテーブルを取得する関数"""
+    try:
+        table = app.dynamodb.Table('app.table_name_schedule')  # テーブル名は適切に設定してください
+        return table
+    except Exception as e:
+        app.logger.error(f"Error getting participation table: {e}")
+        return None
+
 
 @app.route('/schedule/<string:schedule_id>/join', methods=['POST'])
 @login_required
@@ -375,11 +383,16 @@ def join_schedule(schedule_id):
     try:
         venue_date = request.form.get('venue_date')
         if not venue_date:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'error',
+                    'message': '会場情報が見つかりません。'
+                }), 400
             flash("会場情報が見つかりません。", "danger")
             return redirect(url_for('index'))
 
-        # DynamoDBから該当のスケジュールを取得
-        schedule_table = get_schedule_table()
+        # スケジュールテーブルを取得
+        schedule_table = app.dynamodb.Table(app.table_name_schedule)
         response = schedule_table.get_item(
             Key={
                 'venue_date': venue_date,
@@ -389,27 +402,58 @@ def join_schedule(schedule_id):
 
         schedule = response.get('Item')
         if not schedule:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'error',
+                    'message': 'スケジュールが見つかりません。'
+                }), 404
             flash("スケジュールが見つかりません。", "danger")
             return redirect(url_for('index'))
 
-        # 参加者リストに現在のユーザーIDを追加
+        # 参加者リストの取得と更新
         participants = schedule.get('participants', [])
-        if current_user.id not in participants:
-            participants.append(current_user.id)
-            schedule_table.update_item(
-                Key={
-                    'venue_date': venue_date,
-                    'schedule_id': schedule_id
-                },
-                UpdateExpression="SET participants = :participants",
-                ExpressionAttributeValues={':participants': participants}
-            )
-            flash("参加登録が完了しました！", "success")
+        is_joining = False
 
-        return redirect(url_for('index'))  # リロードしてテンプレートを再描画
+        if current_user.id in participants:
+            # すでに参加している場合は削除（キャンセル）
+            participants.remove(current_user.id)
+            message = "参加をキャンセルしました"
+        else:
+            # 参加していない場合は追加
+            participants.append(current_user.id)
+            message = "参加登録が完了しました！"
+            is_joining = True
+
+        # スケジュールテーブルの更新
+        schedule_table.update_item(
+            Key={
+                'venue_date': venue_date,
+                'schedule_id': schedule_id
+            },
+            UpdateExpression="SET participants = :participants",
+            ExpressionAttributeValues={':participants': participants}
+        )
+        
+        # キャッシュをクリア
+        cache.delete_memoized(get_schedules_with_formatting)
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'status': 'success',
+                'message': message,
+                'is_joining': is_joining
+            })
+
+        flash(message, "success")
+        return redirect(url_for('index'))
 
     except Exception as e:
-        app.logger.error(f"Error joining schedule: {e}", exc_info=True)
+        app.logger.error(f"Error in join_schedule: {e}", exc_info=True)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'status': 'error',
+                'message': 'エラーが発生しました。'
+            }), 500
         flash("エラーが発生しました。", "danger")
         return redirect(url_for('index'))
 
@@ -672,7 +716,7 @@ def index():
     canonical=url_for('index', _external=True)
     )
 
-@cache.memoize(timeout=1800)
+@cache.memoize(timeout=30)
 def get_schedules_with_formatting():
     logger.debug("Checking cache for schedules")
     cache_key = "get_schedules_with_formatting"
@@ -708,8 +752,14 @@ def format_date(value):
 
 @app.route('/clear-cache')
 def clear_cache():
-    cache.delete_memoized(get_schedules_with_formatting)
-    return 'キャッシュをクリアしました'  
+    try:
+        cache.delete_memoized(get_schedules_with_formatting)
+        app.logger.info("Cache cleared manually")
+        flash('キャッシュをクリアしました', 'success')
+    except Exception as e:
+        app.logger.error(f"Error clearing cache: {e}")
+        flash('キャッシュのクリアに失敗しました', 'error')
+    return redirect(url_for('index'))  
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -1093,12 +1143,12 @@ def account(user_id):
         if request.method == 'GET':
             app.logger.debug("Initializing form with GET request.")
             form.display_name.data = user['display_name']
-            form.user_name.data = user['user_name']
-            form.furigana.data = user['furigana']
-            form.email.data = user['email']
-            form.phone.data = user['phone']
-            form.post_code.data = user['post_code']
-            form.address.data = user['address']
+            form.user_name.data = user['user_name']            
+            form.furigana.data = user.get('furigana', None)
+            form.email.data = user['email']            
+            form.phone.data = user.get('phone', None)            
+            form.post_code.data = user.get('post_code', None)            
+            form.address.data = user.get('address', None)
             form.gender.data = user['gender']
             try:
                 form.date_of_birth.data = datetime.strptime(user['date_of_birth'], '%Y-%m-%d')

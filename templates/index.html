@@ -66,27 +66,26 @@
                             <td>{{ schedule.venue }}</td>  
                             
                             <td>
-                                <form action="{{ url_for('join_schedule', schedule_id=schedule.schedule_id) }}" method="post">
-                                    <input type="hidden" name="venue_date" value="{{ schedule.venue }}#{{ schedule.date }}">
-                            
-                                    <button class="btn btn-sm 
-                                                   {% if not current_user.is_authenticated %}
-                                                       btn-secondary disabled
-                                                   {% elif current_user.id in schedule.participants %}
-                                                       btn-danger-custom disabled
-                                                   {% else %}
-                                                       btn-primary
-                                                   {% endif %}" 
-                                            {% if not current_user.is_authenticated or current_user.id in schedule.participants %}disabled{% endif %}>
-                                        {% if not current_user.is_authenticated %}
-                                            参加する
-                                        {% elif current_user.id in schedule.participants %}
-                                            参加済み
-                                        {% else %}
-                                            参加する
-                                        {% endif %}
-                                    </button>
-                                </form>
+                                <button class="btn btn-sm join-button 
+                                    {% if not current_user.is_authenticated %}
+                                        btn-secondary disabled
+                                    {% elif current_user.id in schedule.participants %}
+                                        btn-danger
+                                    {% else %}
+                                        btn-primary
+                                    {% endif %}"
+                                    data-schedule-id="{{ schedule.schedule_id }}"
+                                    onclick="joinSchedule(this, '{{ schedule.schedule_id }}', '{{ schedule.venue }}#{{ schedule.date }}')"
+                                    {% if not current_user.is_authenticated %}disabled{% endif %}>
+                                    
+                                    {% if not current_user.is_authenticated %}
+                                        参加する
+                                    {% elif current_user.id in schedule.participants %}
+                                        参加済み
+                                    {% else %}
+                                        参加する
+                                    {% endif %}
+                                </button>
                             </td>
                             
                             {% if current_user.is_authenticated and current_user.is_admin %}
@@ -251,5 +250,54 @@
       </section>         
         
     </div>   
+
+    <script>
+        async function joinSchedule(button, scheduleId, venueDate) {
+            console.log('Attempting to toggle schedule:', { scheduleId, venueDate });
+        
+            try {
+                const response = await fetch(`/schedule/${scheduleId}/join`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: `venue_date=${encodeURIComponent(venueDate)}`
+                });
+        
+                console.log('Server response status:', response.status);
+        
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Success response:', data);
+        
+                    // is_joiningフラグに基づいてボタンの状態を更新
+                    if (data.is_joining) {
+                        // 参加状態に更新
+                        button.classList.remove('btn-primary');
+                        button.classList.add('btn-danger');
+                        button.textContent = '参加済み';
+                    } else {
+                        // 未参加状態に更新
+                        button.classList.remove('btn-danger');
+                        button.classList.add('btn-primary');
+                        button.textContent = '参加する';
+                    }
+        
+                    // オプション：成功メッセージを表示
+                    if (data.message) {
+                        alert(data.message);
+                    }
+                } else {
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    alert(errorData.message || 'エラーが発生しました');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                alert('通信エラーが発生しました');
+            }
+        }
+        </script>
         
 {% endblock %}

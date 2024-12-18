@@ -58,16 +58,6 @@
 }
 
 
-.btn-danger-custom {
-  background-color: #b00020; /* 濃い赤 */
-  border-color: #900018;    /* 境界線の色 */
-  color: #ffffff;           /* 文字色を白に固定 */
-}
-
-.btn-danger-custom:disabled {
-  background-color: #900018; /* 無効時も濃い赤 */
-  border-color: #700014;    /* 境界線の色 */
-  color: #ffffff;           /* 無効状態でも文字色を白に固定 */
-  opacity: 1;               /* disabled のデフォルトの透明度を無効化 */
-  pointer-events: none;     /* クリックを無効化 */
+.btn-danger:disabled {
+  opacity: 1; /* デフォルトで0.65程度になっているので1に戻す */
 }
