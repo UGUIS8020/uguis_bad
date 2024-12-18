@@ -16,17 +16,15 @@ aws_credentials = {
 class ScheduleManager:
     def __init__(self):
         self.dynamodb = boto3.resource('dynamodb', **aws_credentials)
-        self.table = self.dynamodb.Table('Schedule')
+        self.table = self.dynamodb.Table('bad-schedule')  # テーブル名を修正
 
     def add_schedule(self, venue, date, start_time, end_time, day_of_week):
         """スケジュールを追加する"""
-        try:
-            venue_date = f"{venue}#{date}"  # パーテーションキー
+        try:            
             schedule_id = str(uuid.uuid4())  # ユニークなID
 
             item = {
-                'venue_date': venue_date,     # パーテーションキー
-                'schedule_id': schedule_id,   # ソートキー
+                'schedule_id': schedule_id,   # パーテーションキー
                 'venue': venue,               # 会場
                 'date': date,                 # 日付
                 'day_of_week': day_of_week,   # 曜日
