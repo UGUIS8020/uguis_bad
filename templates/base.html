@@ -16,19 +16,16 @@
     </script>   
    
     
-    <!-- タイトルタグの最適化 -->
-    <title>{% block title %}鶯 | 越谷市バドミントンサークル{% endblock %}</title>
-    <meta name="description" content="{% block description %}越谷市で活動しているバドミントンサークルです。新規参加者募集中です{% endblock %}">
-    <!-- カノニカルタグを設定 -->
-    <link rel="canonical" href="{{ canonical_url }}">  
+    <!-- タイトルタグの最適化 -->    
+    <title>{% block title %}{{ title|default('鶯 | 越谷市バドミントンサークル') }}{% endblock %}</title>
+    <meta name="description" content="{{ description|default('越谷市北越谷で活動している社会人バドミントンサークルです。経験者から初心者まで楽しく活動中。見学・体験随時募集中。まずはお気軽にお問い合わせください。') }}">
+    <!-- カノニカルタグを設定 -->   
     
         
     <!-- キーワードの最適化 -->
     <meta name="keywords" content="越谷市バドミントン,社会人サークル,北越谷,初心者歓迎,バドミントン教室,埼玉県,スポーツサークル,運動,健康,趣味,バドミントンコート,練習会,体験募集">
     
-    <!-- ソーシャルメディア用メタタグの強化 -->
-    <meta property="og:title" content="{{ self.title() }}">
-    <meta property="og:description" content="{{ self.description() }}">
+    <!-- ソーシャルメディア用メタタグの強化 -->    
     <meta property="og:image" content="https://uguis-bad.onrender.com/images/001.jpg">
     <meta property="og:url" content="https://uguis-bad.onrender.com/">
     <meta property="og:type" content="website">
@@ -49,6 +46,21 @@
     <!-- 検索エンジンへの追加指示 -->
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://uguis-bad.onrender.com/"> 
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SportsClub",
+        "name": "鶯バドミントン",
+        "description": "越谷市で活動しているバドミントンサークル",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "越谷市",
+          "addressRegion": "埼玉県"
+        },
+        "sport": "バドミントン"
+      }
+      </script>
     
     
     <!-- CSS -->

@@ -668,7 +668,7 @@ def index():
     form=form,
     schedules=schedules,
     title="鶯 | 越谷市バドミントンサークル",
-    description="初心者から経験者まで楽しめる越谷市のバドミントンサークル「鶯」です。",
+    description="越谷市で活動しているバドミントンサークルです。経験者から初心者まで楽しく活動中。見学・体験随時募集中。",    
     canonical=url_for('index', _external=True)
     )
 
@@ -913,6 +913,7 @@ def get_schedule_table():
 
 @app.route("/edit_schedule/<schedule_id>", methods=['GET', 'POST'])
 def edit_schedule(schedule_id):
+    logging.debug(f"Fetching schedule for ID: {schedule_id}")
     form = ScheduleForm()
     table = get_schedule_table()
 
