@@ -51,6 +51,7 @@
                             <th>開始</th>
                             <th>終了</th>
                             <th>会場</th>
+                            <th>詳細</th>
                             <th>参加</th>                         
                             
                         </tr>
@@ -65,7 +66,7 @@
                             <td>{{ schedule.end_time }}</td>
                             <td>{{ schedule.venue }}</td>
                             <td>
-                                <a class="btn btn-info" href="{{ url_for('schedule_detail', schedule_id=schedule.schedule_id) }}">
+                                <a class="btn btn-success" href="{{ url_for('schedule_detail', schedule_id=schedule.schedule_id) }}">
                                     詳細
                                 </a>
                             </td>
