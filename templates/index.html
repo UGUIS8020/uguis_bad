@@ -13,7 +13,7 @@
                     <div class="col-12 col-md-8 text-center">  
                         <div>
                             <h3>参加費</h3>
-                            <p>初回1000円、2回目以降 700円</p>
+                            <p>初回1000円、2回目以降 男性700円 女性600円</p>
                         </div>
                         <h3>練習場所</h3>
                         <div class="mb-3">            
@@ -36,7 +36,7 @@
                  <!-- ログインしていない場合、仮登録案内を表示 -->
             {% if not current_user.is_authenticated %}
             <div class="mt-3">
-                <p>練習に参加するには仮登録をしてください。(テスト中で未稼働)
+                <p>練習に参加するにはログイン、または仮登録をしてください。
                 <a href="{{ url_for('temp_register') }}" class="btn btn-warning">仮登録へ</a></p>
             </div>
             {% endif %}            
@@ -51,7 +51,7 @@
                             <th>開始</th>
                             <th>終了</th>
                             <th>会場</th>
-                            <th>参加(テスト中未稼働)</th>                         
+                            <th>参加</th>                         
                             
                         </tr>
                     </thead>
@@ -63,7 +63,12 @@
                             <td>{{ schedule.day_of_week }}</td>
                             <td>{{ schedule.start_time }}</td>
                             <td>{{ schedule.end_time }}</td>
-                            <td>{{ schedule.venue }}</td>  
+                            <td>{{ schedule.venue }}</td>
+                            <td>
+                                <a class="btn btn-info" href="{{ url_for('schedule_detail', schedule_id=schedule.schedule_id) }}">
+                                    詳細
+                                </a>
+                            </td>
                             
                             <td>
                                 <button class="btn btn-sm join-button 

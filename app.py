@@ -46,7 +46,7 @@ def create_app():
 
         # キャッシュの設定と初期化
         app.config["CACHE_TYPE"] = "simple"
-        app.config["CACHE_DEFAULT_TIMEOUT"] = 1800
+        app.config["CACHE_DEFAULT_TIMEOUT"] = 0000
         cache.init_app(app)
        
 
@@ -298,10 +298,10 @@ class TempRegistrationForm(FlaskForm):
         'バドミントン歴', 
         choices=[
             ('', 'バドミントン歴を選択してください'),
-            ('no_experience', '未経験者'),
-            ('less_than_1_year', '1年未満'),
-            ('1_to_3_years', '1年以上～3年未満'),
-            ('more_than_3_years', '3年以上')
+            ('未経験者', '未経験者'),
+            ('1年未満', '1年未満'),
+            ('年以上～3年未満', '1年以上～3年未満'),
+            ('3年以上', '3年以上')
         ], 
         validators=[
             DataRequired(message='バドミントン歴を選択してください')
@@ -381,21 +381,10 @@ def get_participation_table():
 @login_required
 def join_schedule(schedule_id):
     try:
-        venue_date = request.form.get('venue_date')
-        if not venue_date:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'status': 'error',
-                    'message': '会場情報が見つかりません。'
-                }), 400
-            flash("会場情報が見つかりません。", "danger")
-            return redirect(url_for('index'))
-
         # スケジュールテーブルを取得
         schedule_table = app.dynamodb.Table(app.table_name_schedule)
         response = schedule_table.get_item(
-            Key={
-                'venue_date': venue_date,
+            Key={                
                 'schedule_id': schedule_id
             }
         )
@@ -426,8 +415,7 @@ def join_schedule(schedule_id):
 
         # スケジュールテーブルの更新
         schedule_table.update_item(
-            Key={
-                'venue_date': venue_date,
+            Key={                
                 'schedule_id': schedule_id
             },
             UpdateExpression="SET participants = :participants",
@@ -614,8 +602,8 @@ class ScheduleForm(FlaskForm):
         ('北越谷 A面', '北越谷 A面'),
         ('北越谷 B面', '北越谷 B面'),
         ('北越谷 AB面', '北越谷 AB面'),
-        ('越谷総合体育館 第1体育室', '越谷総合体育館 第1体育室'),
-        ('越谷総合体育館 第1体育室 6面', '越谷総合体育館 第1体育室 6面'),
+        ('越谷総合体育館 第1 2面', '越谷総合体育館 第1 2面'),
+        ('越谷総合体育館 第1 6面', '越谷総合体育館 第1 6面'),
         ('ウィングハット', 'ウィングハット')
     ])
     
@@ -667,7 +655,7 @@ class Board_Form(FlaskForm):
 
 def get_schedule_table():
     dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
-    return dynamodb.Table('Schedule')
+    return dynamodb.Table('bad-schedule')
 
 
 @app.route("/", methods=['GET', 'POST'])
@@ -686,18 +674,16 @@ def index():
                 'venue': form.venue.data,
                 'start_time': form.start_time.data,        # そのまま HH:MM 形式で保存
                 'end_time': form.end_time.data,           # そのまま HH:MM 形式で保存
-                'venue_date': f"{form.venue.data}#{form.date.data.isoformat()}",
                 'created_at': datetime.now().isoformat(),                
                 'status': 'active'
-            }
+            }            
 
             schedule_table.put_item(Item=schedule_data)
             cache.delete_memoized(get_schedules_with_formatting)
             flash('スケジュールが登録されました', 'success')
             return redirect(url_for('index'))
 
-        except Exception as e:
-           
+        except Exception as e:           
             flash('スケジュールの登録中にエラーが発生しました', 'error')
 
     # スケジュール一覧の取得とソート
@@ -708,37 +694,60 @@ def index():
         schedules = []    
 
     return render_template(
-    "index.html",
-    form=form,
-    schedules=schedules,
-    title="鶯 | 越谷市バドミントンサークル",
-    description="越谷市で活動しているバドミントンサークルです。経験者から初心者まで楽しく活動中。見学・体験随時募集中。",    
-    canonical=url_for('index', _external=True)
+        "index.html",
+        form=form,
+        schedules=schedules,
+        title="鶯 | 越谷市バドミントンサークル",
+        description="越谷市で活動しているバドミントンサークルです。経験者から初心者まで楽しく活動中。見学・体験随時募集中。",    
+        canonical=url_for('index', _external=True)
     )
 
-@cache.memoize(timeout=30)
+@cache.memoize(timeout=0000)
 def get_schedules_with_formatting():
     logger.debug("Checking cache for schedules")
-    cache_key = "get_schedules_with_formatting"
-    logger.debug(f"Checking cache for key: {cache_key}")
-
-    print("DynamoDBからデータを取得中...")
+    
     schedule_table = get_schedule_table()
-    if not schedule_table:
-        raise ValueError("Schedule table is not initialized")
-
+    user_table = app.dynamodb.Table(app.table_name)
+    
     response = schedule_table.scan()
     schedules = []
+    
     for schedule in response.get('Items', []):
-        # date_obj = datetime.strptime(schedule['date'], "%Y-%m-%d")
         date_obj = parser.parse(schedule['date'])
-        
         formatted_date = f"{date_obj.month}月{date_obj.day}日"
         schedule['formatted_date'] = formatted_date
         
+        print(f"Schedule ID: {schedule.get('schedule_id')}")
+        print(f"Participants: {schedule.get('participants', [])}")
+        
+        participants_info = []
+        if 'participants' in schedule and schedule['participants']:
+            try:
+                for participant_id in schedule['participants']:
+                    # user#プレフィックスを追加
+                    user_key = f"user#{participant_id}"
+                    user_response = user_table.get_item(
+                        Key={
+                            'user#user_id': user_key  # キー名も正しいものに修正
+                        }
+                    )
+                    if 'Item' in user_response:
+                        user = user_response['Item']
+                        print(f"Found user: {user.get('display_name')}")
+                        participants_info.append({
+                            'user_id': participant_id,
+                            'display_name': user.get('display_name', '名前なし')
+                        })
+                    else:
+                        print(f"User not found: {user_key}")
+            except Exception as e:
+                print(f"Error getting user info: {str(e)}")
+                logger.error(f"参加者情報の取得中にエラーが発生: {str(e)}")
+        
+        schedule['participants_info'] = participants_info
+        print(f"Final participants_info: {participants_info}")
         schedules.append(schedule)
-
-    logger.debug(f"Caching data for key: {cache_key}")
+    
     return schedules
 
 @app.template_filter('format_date')
@@ -944,7 +953,7 @@ def is_safe_url(target):
 
         
 @app.route("/logout")
-# @login_required
+@login_required
 def logout():
     logout_user()
     return redirect("/")
@@ -952,7 +961,7 @@ def logout():
 def get_schedule_table():
     # デバッグログを追加
     region = os.getenv('AWS_REGION')
-    table_name = os.getenv('TABLE_NAME_SCHEDULE', 'Schedule')
+    table_name = os.getenv('TABLE_NAME_SCHEDULE')
     
     app.logger.debug(f"Region: {region}")
     app.logger.debug(f"Table name: {table_name}")
@@ -960,37 +969,96 @@ def get_schedule_table():
     dynamodb = boto3.resource('dynamodb', region_name=region)
     return dynamodb.Table(table_name) 
 
+@app.route("/schedule/<string:schedule_id>", methods=["GET"])
+def schedule_detail(schedule_id):
+    try:
+        schedule_table = get_schedule_table()
+        user_table = app.dynamodb.Table(app.table_name)
+        
+        # テーブル構造を確認
+        table_description = user_table.meta.client.describe_table(
+            TableName=app.table_name
+        )
+        print(f"Table structure: {table_description['Table']['KeySchema']}")
+        
+        response = schedule_table.get_item(
+            Key={
+                'schedule_id': schedule_id
+            }
+        )
+        
+        schedule = response.get('Item')
+        if not schedule:
+            abort(404)
+            
+        print(f"Schedule participants: {schedule.get('participants', [])}")
+        
+        participants_info = []
+        if 'participants' in schedule and schedule['participants']:
+            for participant_id in schedule['participants']:
+                try:
+                    # まずscanでユーザー情報を探してみる
+                    scan_response = user_table.scan(
+                        FilterExpression='contains(#uid, :pid)',
+                        ExpressionAttributeNames={
+                            '#uid': 'user#user_id'
+                        },
+                        ExpressionAttributeValues={
+                            ':pid': participant_id
+                        }
+                    )
+                    print(f"Scan response: {scan_response}")  # デバッグ出力
+                    
+                    if scan_response.get('Items'):
+                        user = scan_response['Items'][0]
+                        participants_info.append({
+                            'user_id': participant_id,
+                            'display_name': user.get('display_name', '名前なし'),
+                            'experience': user.get('badminton_experience', '未設定')
+                        })
+                except Exception as e:
+                    print(f"Error details: {str(e)}")
+                    app.logger.error(f"参加者情報の取得中にエラー: {str(e)}")
+        
+        schedule['participants_info'] = participants_info
+        print(f"Final participants_info: {participants_info}")  # デバッグ出力
+        return render_template("schedule_detail.html", schedule=schedule)
+        
+    except Exception as e:
+        app.logger.error(f"スケジュール詳細の取得中にエラー: {str(e)}")
+        abort(500)
+
 
 @app.route("/edit_schedule/<schedule_id>", methods=['GET', 'POST'])
 def edit_schedule(schedule_id):
     logging.debug(f"Fetching schedule for ID: {schedule_id}")
     form = ScheduleForm()
     table = get_schedule_table()
+    schedule = None  # 初期値を設定
 
-    if form.validate_on_submit():  # POSTリクエストとバリデーション
-        try:
-            # まず現在のアイテムを取得
-            response = table.scan(
-                FilterExpression='schedule_id = :sid',
-                ExpressionAttributeValues={
-                    ':sid': schedule_id
-                }
-            )
-            items = response.get('Items', [])
-            
-            if items:
-                current_item = items[0]
-                # 新しいvenue_dateを作成
-                new_venue_date = f"{form.venue.data}#{form.date.data.isoformat()}"
-                
-                # 古いアイテムを削除
-                table.delete_item(
-                    Key={
-                        'venue_date': current_item['venue_date'],
-                        'schedule_id': schedule_id
-                    }
-                )
-                
+    try:
+        # スケジュールの取得
+        response = table.get_item(
+            Key={
+                'schedule_id': schedule_id
+            }
+        )
+        schedule = response.get('Item')
+        
+        if not schedule:
+            flash('スケジュールが見つかりません', 'error')
+            return redirect(url_for('index'))
+
+        if request.method == 'GET':
+            # GETリクエスト時のフォーム初期値設定
+            form.date.data = datetime.strptime(schedule['date'], '%Y-%m-%d').date()
+            form.day_of_week.data = schedule['day_of_week']
+            form.venue.data = schedule['venue']
+            form.start_time.data = schedule['start_time']
+            form.end_time.data = schedule['end_time']
+        
+        elif form.validate_on_submit():  # POSTリクエストとバリデーション
+            try:
                 # 新しいアイテムを作成
                 new_item = {
                     'schedule_id': schedule_id,
@@ -999,37 +1067,18 @@ def edit_schedule(schedule_id):
                     'venue': form.venue.data,
                     'start_time': form.start_time.data,
                     'end_time': form.end_time.data,
-                    'venue_date': new_venue_date,
                     'created_at': datetime.now().isoformat()
                 }
                 
-                # 新しいアイテムを保存
+                # 更新
                 table.put_item(Item=new_item)
                 
                 flash('スケジュールを更新しました', 'success')
                 return redirect(url_for('index'))
-            
-        except Exception as e:
-            app.logger.error(f"スケジュール更新エラー: {str(e)}")
-            flash('スケジュールの更新中にエラーが発生しました', 'error')
-
-    try:
-        # GETリクエスト時のフォーム表示用データ取得
-        response = table.scan(
-            FilterExpression='schedule_id = :sid',
-            ExpressionAttributeValues={
-                ':sid': schedule_id
-            }
-        )
-        items = response.get('Items', [])
-        
-        if items and request.method == 'GET':
-            schedule = items[0]
-            form.date.data = datetime.strptime(schedule['date'], '%Y-%m-%d').date()
-            form.day_of_week.data = schedule['day_of_week']
-            form.venue.data = schedule['venue']
-            form.start_time.data = schedule['start_time']
-            form.end_time.data = schedule['end_time']
+                
+            except Exception as e:
+                app.logger.error(f"スケジュール更新エラー: {str(e)}")
+                flash('スケジュールの更新中にエラーが発生しました', 'error')
             
     except ClientError as e:
         app.logger.error(f"スケジュール取得エラー: {str(e)}")
@@ -1045,34 +1094,22 @@ def delete_schedule(schedule_id):
         table = get_schedule_table()
         app.logger.debug(f"Deleting schedule_id: {schedule_id}")
 
-        # スケジュールIDでスキャン
-        response = table.scan(
-            FilterExpression='schedule_id = :sid',
-            ExpressionAttributeValues={
-                ':sid': schedule_id
-            }
-        )
-        items = response.get('Items', [])
-        
-        app.logger.debug(f"Found items: {items}")
-        
-        if items:
-            schedule = items[0]
-            app.logger.debug(f"Attempting to delete: venue_date={schedule['venue_date']}, schedule_id={schedule_id}")
-            
-            # 両方のキーを指定して削除
+        # schedule_idをプライマリキーとして直接削除
+        try:
             delete_response = table.delete_item(
                 Key={
-                    'venue_date': schedule['venue_date'],
                     'schedule_id': schedule_id
                 }
             )
             app.logger.debug(f"Delete response: {delete_response}")
-            
             flash('スケジュールを削除しました', 'success')
-        else:
-            app.logger.error(f"Schedule not found: {schedule_id}")
-            flash('スケジュールが見つかりません', 'error')
+            
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                app.logger.error(f"Schedule not found: {schedule_id}")
+                flash('スケジュールが見つかりません', 'error')
+            else:
+                raise
             
     except Exception as e:
         app.logger.error(f"スケジュール削除エラー: {str(e)}")
@@ -1080,7 +1117,6 @@ def delete_schedule(schedule_id):
         flash('スケジュールの削除中にエラーが発生しました', 'error')
         
     return redirect(url_for('index'))
-
 
 
 @app.route("/user_maintenance", methods=["GET", "POST"])
