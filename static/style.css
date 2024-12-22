@@ -31,13 +31,9 @@
 }
 
 .schedule h2 {
-  color: #444;
-  margin: 25px 0 15px;
-  padding-bottom: 5px;
-  border-bottom: 2px solid #eee;
+  color: #333;
+  margin: 0;
 }
-
-
 
 .schedule table th {
   padding: 10px 0% ;
@@ -50,6 +46,14 @@
   margin: 5px 0;                  
   background-color: #ebe8e6;
   
+}
+
+.schedule-title {
+  justify-content: center;
+  background-color: #8ea604;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 8px;
 }
 
 .special-venue {

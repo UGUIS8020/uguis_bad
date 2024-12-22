@@ -72,7 +72,7 @@
                                 {{ render_field(form.badminton_experience, placeholder="例: 経験3年・社会人サークルで活動中", class="form-control form-control-lg") }}
                                 <div class="form-text text-light">※できるだけ詳しくご記入ください</div>
                                 {% if form.badminton_experience.errors %}
-                                    <p class="text-warning">{{ form.badminton_experience.errors[0] }}</p>
+                                    <p class="text-danger">{{ form.badminton_experience.errors[0] }}</p>
                                 {% endif %}
                             </div>
 
@@ -81,7 +81,7 @@
                                 <label class="form-label">メールアドレス <span class="badge bg-warning text-dark">必須</span></label>
                                 {{ render_field(form.email, placeholder="メールアドレス", class="form-control form-control-lg") }}
                                 {% if form.email.errors %}
-                                    <p class="text-warning">{{ form.email.errors[0] }}</p>
+                                    <p class="text-danger">{{ form.email.errors[0] }}</p>
                                 {% endif %}
                             </div>
 
@@ -90,7 +90,7 @@
                                 <label class="form-label">パスワード <span class="badge bg-warning text-dark">必須</span></label>
                                 {{ render_field(form.password, placeholder="8文字以上で設定してください", class="form-control form-control-lg") }}
                                 {% if form.password.errors %}
-                                    <p class="text-warning">{{ form.password.errors[0] }}</p>
+                                    <p class="text-danger">{{ form.password.errors[0] }}</p>
                                 {% endif %}
                             </div>
 
@@ -99,6 +99,56 @@
                                 {{ form.submit(class="btn btn-outline-light btn-lg w-100") }}
                             </div>
                         </form>
+                        <script>
+
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const birthdateInput = document.querySelector('input[name="date_of_birth"]');
+                                const guardianSection = document.getElementById('guardianSection');
+                            
+                                function calculateAge(birthdate) {
+                                    const today = new Date();
+                                    const birthDate = new Date(birthdate);
+                                    let age = today.getFullYear() - birthDate.getFullYear();
+                                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                                    
+                                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                                        age--;
+                                    }
+                                    return age;
+                                }
+                            
+                                if (birthdateInput) {
+                                    function checkAge() {
+                                        if (birthdateInput.value) {
+                                            const age = calculateAge(birthdateInput.value);
+                                            console.log('Calculated age:', age); // デバッグ用
+                                            if (age < 18) {
+                                                guardianSection.style.display = 'block';
+                                            } else {
+                                                guardianSection.style.display = 'none';
+                                            }
+                                        }
+                                    }
+                            
+                                    // 初期チェック
+                                    checkAge();
+                            
+                                    // 生年月日が変更されたときのチェック
+                                    birthdateInput.addEventListener('change', checkAge);
+                                }
+                            });
+                            
+                            document.querySelector('form').addEventListener('submit', function(e) {
+                                console.log('Form submission attempted');
+                                // フォームの各フィールドの値をログ出力
+                                const formData = new FormData(this);
+                                for (let [key, value] of formData.entries()) {
+                                    console.log(key + ': ' + value);
+                                }
+                            });
+
+                        </script>
+                        
                     </div>
                 </div>
             </div>
