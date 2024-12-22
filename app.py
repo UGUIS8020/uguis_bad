@@ -1,6 +1,6 @@
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from flask import Flask, render_template, request, redirect, url_for, flash, abort, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, session, jsonify, current_app
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from wtforms import ValidationError, StringField,  TextAreaField, PasswordField, SubmitField, SelectField, DateField, BooleanField
@@ -9,6 +9,7 @@ from flask_wtf.file import FileField, FileAllowed, FileSize
 import pytz
 import os
 import boto3
+from boto3.dynamodb.conditions import Key
 from werkzeug.utils import secure_filename
 import uuid
 from datetime import datetime, date
@@ -43,10 +44,12 @@ def create_app():
         # Secret Keyの設定
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(24))
         print(f"Secret key: {app.config['SECRET_KEY']}")
-
-        # キャッシュの設定と初期化
-        app.config["CACHE_TYPE"] = "simple"
-        app.config["CACHE_DEFAULT_TIMEOUT"] = 0000
+        
+        app.config.update(
+            CACHE_TYPE="simple",
+            CACHE_DEFAULT_TIMEOUT=600,  # 5分
+            CACHE_THRESHOLD=1000  # キャッシュエントリの最大数
+        )
         cache.init_app(app)
        
 
@@ -102,7 +105,6 @@ def create_app():
 # アプリケーションの初期化
 app = create_app()
 
-
 def tokyo_time():
     return datetime.now(pytz.timezone('Asia/Tokyo'))
 
@@ -148,7 +150,7 @@ def load_user(user_id):
 
 
 class RegistrationForm(FlaskForm):
-    organization = SelectField('所属', choices=[('鶯', '鶯'),('other', 'その他')], default='鶯', validators=[DataRequired(message='所属を選択してください')])
+    organization = SelectField('所属', choices=[('', '選択してください'), ('鶯', '鶯'), ('gest', 'ゲスト'), ('Boot_Camp15', 'Boot Camp15'), ('other', 'その他'),], default='', validators=[DataRequired(message='所属を選択してください')])
     display_name = StringField('表示名 LINE名など', validators=[DataRequired(message='表示名を入力してください'), Length(min=1, max=30, message='表示名は1文字以上30文字以下で入力してください')])
     user_name = StringField('ユーザー名', validators=[DataRequired()])
     furigana = StringField('フリガナ', validators=[DataRequired()])
@@ -159,10 +161,23 @@ class RegistrationForm(FlaskForm):
     email_confirm = StringField('メールアドレス確認', validators=[DataRequired(), Email(), EqualTo('email', message='メールアドレスが一致していません')])
     password = PasswordField('8文字以上のパスワード', validators=[DataRequired(), Length(min=8, message='パスワードは8文字以上で入力してください'), EqualTo('pass_confirm', message='パスワードが一致していません')])
     pass_confirm = PasswordField('パスワード(確認)', validators=[DataRequired()])    
-    gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])
+    gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性')], validators=[DataRequired()])
     date_of_birth = DateField('生年月日', format='%Y-%m-%d', validators=[DataRequired()])
-    guardian_name = StringField('保護者氏名')
-    emergency_phone = StringField('緊急連絡先電話番号', validators=[DataRequired(), Length(min=10, max=15, message='正しい電話番号を入力してください')])
+    guardian_name = StringField('保護者氏名', validators=[Optional()])  
+    emergency_phone = StringField('緊急連絡先電話番号', validators=[Optional(), Length(min=10, max=15, message='正しい電話番号を入力してください')])
+    badminton_experience = SelectField(
+        'バドミントン歴', 
+        choices=[
+            ('', 'バドミントン歴を選択してください'),
+            ('未経験者', '未経験者'),
+            ('1年未満', '1年未満'),
+            ('1年以上～3年未満', '1年以上～3年未満'),
+            ('3年以上', '3年以上')
+        ], 
+        validators=[
+            DataRequired(message='バドミントン歴を選択してください')
+        ]
+    )
     submit = SubmitField('登録')
 
     def validate_guardian_name(self, field):
@@ -174,25 +189,33 @@ class RegistrationForm(FlaskForm):
 
     def validate_email(self, field):
         try:
+            # DynamoDB テーブル取得
             table = app.dynamodb.Table(app.table_name)
-            # emailのインデックスを使用して検索
-            # email-indexを使用してメールアドレスを検索
+            current_app.logger.debug(f"Querying email-index for email: {field.data}")
+
+            # email-indexを使用してクエリ
             response = table.query(
                 IndexName='email-index',
-                KeyConditionExpression='email = :email',
-                ExpressionAttributeValues={
-                    ':email': field.data
-                }
+                KeyConditionExpression=Key('email').eq(field.data)  # 修正済み
             )
+            current_app.logger.debug(f"Query response: {response}")
+
+            # 登録済みのメールアドレスが見つかった場合
             if response.get('Items'):
                 raise ValidationError('入力されたメールアドレスは既に登録されています。')
+
+        except ValidationError as ve:
+            # ValidationErrorはそのままスロー
+            raise ve
+
         except Exception as e:
-            app.logger.error(f"Error validating email: {str(e)}")
+            # その他の例外をキャッチしてログに出力
+            current_app.logger.error(f"Error validating email: {str(e)}")
             raise ValidationError('メールアドレスの確認中にエラーが発生しました。')
-        
+                    
         
 class UpdateUserForm(FlaskForm):
-    organization = SelectField('所属', choices=[('鶯', '鶯'),('other', 'その他')], default='鶯', validators=[DataRequired(message='所属を選択してください')])
+    organization = SelectField('所属', choices=[('鶯', '鶯'), ('gest', 'ゲスト'), ('Boot_Camp15', 'Boot Camp15'), ('other', 'その他')], default='鶯', validators=[DataRequired(message='所属を選択してください')])
     display_name = StringField('表示名 LINE名など', validators=[DataRequired(), Length(min=1, max=30)])
     user_name = StringField('ユーザー名', validators=[DataRequired()])
     furigana = StringField('フリガナ', validators=[DataRequired()])
@@ -203,10 +226,24 @@ class UpdateUserForm(FlaskForm):
     email_confirm = StringField('確認用メールアドレス', validators=[Optional(), Email()])
     password = PasswordField('パスワード', validators=[Optional(), Length(min=8), EqualTo('pass_confirm', message='パスワードが一致していません')])
     pass_confirm = PasswordField('パスワード(確認)')
-    gender = SelectField('性別', choices=[('', '性別'), ('male', '男性'), ('female', '女性'), ('other', 'その他')], validators=[DataRequired()])
+    gender = SelectField('性別', choices=[('male', '男性'), ('female', '女性')], validators=[DataRequired()])
     date_of_birth = DateField('生年月日', format='%Y-%m-%d', validators=[DataRequired()])
-    guardian_name = StringField('保護者氏名', validators=[Optional()])
-    emergency_phone = StringField('緊急連絡先電話番号', validators=[Optional(), Length(min=10, max=15)])
+    guardian_name = StringField('保護者氏名', validators=[Optional()])    
+    emergency_phone = StringField('緊急連絡先電話番号', validators=[Optional(), Length(min=10, max=15, message='正しい電話番号を入力してください')])
+    badminton_experience = SelectField(
+        'バドミントン歴', 
+        choices=[
+            ('', 'バドミントン歴を選択してください'),
+            ('未経験者', '未経験者'),
+            ('1年未満', '1年未満'),
+            ('年以上～3年未満', '1年以上～3年未満'),
+            ('3年以上', '3年以上')
+        ], 
+        validators=[
+            DataRequired(message='バドミントン歴を選択してください')
+        ]
+    )
+
     submit = SubmitField('更新')
 
     def __init__(self, user_id, dynamodb_table, *args, **kwargs):
@@ -327,7 +364,429 @@ class TempRegistrationForm(FlaskForm):
     )
     
     # 登録ボタン
-    submit = SubmitField('仮登録')
+    submit = SubmitField('仮登録')  
+
+    def validate_email(self, field):
+        try:
+            # DynamoDB テーブル取得
+            table = app.dynamodb.Table(app.table_name)
+            current_app.logger.debug(f"Querying email-index for email: {field.data}")
+
+            # email-indexを使用してクエリ
+            response = table.query(
+                IndexName='email-index',
+                KeyConditionExpression=Key('email').eq(field.data)  # 修正済み
+            )
+            current_app.logger.debug(f"Query response: {response}")
+
+            # 登録済みのメールアドレスが見つかった場合
+            if response.get('Items'):
+                raise ValidationError('このメールアドレスは既に使用されています。他のメールアドレスをお試しください。')
+
+        except ValidationError as ve:
+            # ValidationErrorはそのままスロー
+            raise ve
+
+        except Exception as e:
+            # その他の例外をキャッチしてログに出力
+            current_app.logger.error(f"Error validating email: {str(e)}")
+            raise ValidationError('メールアドレスの確認中にエラーが発生しました。')
+
+
+class Board_Form(FlaskForm):
+    title = StringField('タイトル', 
+        validators=[
+            DataRequired(message='タイトルを入力してください'),
+            Length(max=100, message='タイトルは100文字以内で入力してください')
+        ])
+    
+    content = TextAreaField('内容', 
+        validators=[
+            DataRequired(message='内容を入力してください'),
+            Length(max=2000, message='内容は2000文字以内で入力してください')
+        ])
+    
+    admin_memo = TextAreaField('管理者用メモ', validators=[Optional()])  # 追加
+    
+    image = FileField('ファイル', 
+        validators=[
+            FileAllowed(
+                ['jpg', 'jpeg', 'png', 'gif', 'pdf'],
+                'jpg, jpeg, png, gif, pdfファイルのみアップロード可能です'
+            ),
+            FileSize(max_size=5 * 1024 * 1024, message='ファイルサイズは5MB以内にしてください')  # 5MB制限
+        ])
+    
+    remove_image = BooleanField('画像を削除する')
+    
+    submit = SubmitField('投稿する')
+
+    def validate_image(self, field):
+        if field.data:
+            filename = field.data.filename.lower()
+            if not any(filename.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.pdf']):
+                raise ValidationError('許可されていないファイル形式です') 
+
+
+class LoginForm(FlaskForm):
+    email = StringField('メールアドレス', validators=[DataRequired(message='メールアドレスを入力してください'), Email(message='正しいメールアドレスの形式で入力してください')])
+    password = PasswordField('パスワード', validators=[DataRequired(message='パスワードを入力してください')])
+    remember = BooleanField('ログイン状態を保持する')
+    submit = SubmitField('ログイン')
+
+    def __init__(self, *args, **kwargs):
+        super(LoginForm, self).__init__(*args, **kwargs)
+        self.user = None  # self.userを初期化
+
+    def validate_email(self, field):
+        """メールアドレスの存在確認"""
+        try:
+            # メールアドレスでユーザーを検索
+            response = app.table.query(
+                IndexName='email-index',
+                KeyConditionExpression='email = :email',
+                ExpressionAttributeValues={
+                    ':email': field.data
+                }
+            )
+            
+            items = response.get('Items', [])
+            if not items:
+                raise ValidationError('このメールアドレスは登録されていません')            
+            
+            # ユーザー情報を保存（パスワード検証で使用）
+            self.user = items[0]
+            # ユーザーをロード
+            app.logger.debug(f"User found for email: {field.data}")       
+           
+        
+        except Exception as e:
+            app.logger.error(f"Login error: {e}")
+            raise ValidationError('ログイン処理中にエラーが発生しました')
+
+    def validate_password(self, field):
+        """パスワードの検証"""
+        if not self.user:
+            raise ValidationError('先にメールアドレスを確認してください')
+
+        stored_hash = self.user.get('password')
+        app.logger.debug(f"Retrieved user: {self.user}")
+        app.logger.debug(f"Stored hash: {stored_hash}")
+        if not stored_hash:
+            app.logger.error("No password hash found in user data")
+            raise ValidationError('登録情報が正しくありません')
+
+        app.logger.debug("Validating password against stored hash")
+        if not check_password_hash(stored_hash, field.data):
+            app.logger.debug("Password validation failed")
+            raise ValidationError('パスワードが正しくありません')
+
+
+class ScheduleForm(FlaskForm):
+    date = DateField('日付', validators=[DataRequired()])
+    day_of_week = StringField('曜日', render_kw={'readonly': True})  # 自動入力用
+    
+    venue = SelectField('会場', validators=[DataRequired()], choices=[
+        ('', '選択してください'),
+        ('北越谷 A面', '北越谷 A面'),
+        ('北越谷 B面', '北越谷 B面'),
+        ('北越谷 AB面', '北越谷 AB面'),
+        ('総合体育館 第一 2面', '総合体育館 第一 2面'),
+        ('総合体育館 第一 6面', '総合体育館 第一 6面'),
+        ('総合体育館 第二 3面', '総合体育館 第二 3面'),
+        ('ウィングハット', 'ウィングハット')
+    ])
+    
+    start_time = SelectField('開始時間', validators=[DataRequired()], choices=[
+        ('', '選択してください')] + 
+        [(f"{h:02d}:00", f"{h:02d}:00") for h in range(9, 23)]
+    )
+    
+    end_time = SelectField('終了時間', validators=[DataRequired()], choices=[
+        ('', '選択してください')] + 
+        [(f"{h:02d}:00", f"{h:02d}:00") for h in range(10, 24)]
+    )
+    
+    submit = SubmitField('登録') 
+
+
+class User(UserMixin):
+    def __init__(self, user_id, display_name, user_name, furigana, email, password_hash,
+                 gender, date_of_birth, post_code, address, phone, guardian_name, emergency_phone, badminton_experience,
+                 organization='other', administrator=False, 
+                 created_at=None, updated_at=None):
+        super().__init__()
+        self.id = user_id
+        self.display_name = display_name
+        self.user_name = user_name
+        self.furigana = furigana
+        self.email = email 
+        self._password_hash = password_hash
+        self.gender = gender
+        self.date_of_birth = date_of_birth
+        self.post_code = post_code
+        self.address = address
+        self.phone = phone
+        self.guardian_name = guardian_name 
+        self.emergency_phone = emergency_phone 
+        self.organization = organization
+        self.badminton_experience = badminton_experience
+        self.administrator = administrator
+        self.created_at = created_at or datetime.now().isoformat()
+        self.updated_at = updated_at or datetime.now().isoformat()
+
+    def check_password(self, password):
+        return check_password_hash(self._password_hash, password)  # _password_hashを使用
+
+    @property
+    def is_admin(self):
+        return self.administrator    
+   
+
+    @staticmethod
+    def from_dynamodb_item(item):
+        def get_value(field, default=None):
+            return item.get(field, default)
+
+        return User(
+            user_id=get_value('user#user_id'),
+            display_name=get_value('display_name'),
+            user_name=get_value('user_name'),
+            furigana=get_value('furigana'),
+            email=get_value('email'),
+            password_hash=get_value('password'),  # 修正：password フィールドを取得
+            gender=get_value('gender'),
+            date_of_birth=get_value('date_of_birth'),
+            post_code=get_value('post_code'),
+            address=get_value('address'),
+            phone=get_value('phone'),
+            guardian_name=get_value('guardian_name', default=None),
+            emergency_phone=get_value('emergency_phone', default=None),
+            organization=get_value('organization', default='other'),
+            badminton_experience=get_value('badminton_experience'),
+            administrator=bool(get_value('administrator', False)),
+            created_at=get_value('created_at'),
+            updated_at=get_value('updated_at')
+        )
+
+    def to_dynamodb_item(self):
+        fields = ['user_id', 'organization', 'address', 'administrator', 'created_at', 
+                  'display_name', 'email', 'furigana', 'gender', 'password', 
+                  'phone', 'post_code', 'updated_at', 'user_name','guardian_name', 'emergency_phone']
+        item = {field: {"S": str(getattr(self, field))} for field in fields if getattr(self, field, None)}
+        item['administrator'] = {"BOOL": self.administrator}
+        if self.date_of_birth:
+            item['date_of_birth'] = {"S": str(self.date_of_birth)}
+            return item
+
+
+def get_user_from_dynamodb(user_id):
+    try:
+        # DynamoDBからユーザーデータを取得
+        response = app.dynamodb.get_item(
+            TableName=app.table_name,
+            Key={"user#user_id": {"S": user_id}}
+            
+        )
+        
+        # データが存在しない場合
+        if 'Item' not in response:
+            app.logger.info(f"User not found in DynamoDB for user_id: {user_id}")
+            return None
+
+        item = response['Item']
+
+        # DynamoDBのデータをUserクラスのインスタンスに変換
+        user = User.from_dynamodb_item(item)
+        app.logger.debug(f"User successfully loaded for user_id: {user_id}")
+        return user
+
+    except Exception as e:
+        app.logger.error(f"Error fetching user from DynamoDB for user_id: {user_id}: {str(e)}", exc_info=True)
+        return None
+    
+
+def get_schedule_table():
+    """スケジュールテーブルを取得する関数
+    
+    Returns:
+        boto3.resources.factory.dynamodb.Table: DynamoDBのテーブルオブジェクト
+    """
+    # 環境変数から設定を取得
+    region = os.getenv('AWS_REGION')  # デフォルト値を設定
+    table_name = os.getenv('TABLE_NAME_SCHEDULE')  # デフォルト値を設定
+    
+    # デバッグログ
+    app.logger.debug(f"Region: {region}")
+    app.logger.debug(f"Table name: {table_name}")
+    
+    try:
+        dynamodb = boto3.resource('dynamodb', region_name=region)
+        table = dynamodb.Table(table_name)
+        return table
+    except Exception as e:
+        app.logger.error(f"Error getting schedule table: {e}")
+        raise  # エラーを上位に伝播させる
+
+
+def get_board_table():
+    """
+    DynamoDB テーブルを取得する関数。
+    テーブル名とリージョンは環境変数を使用して設定。
+    """
+    # 環境変数からリージョンとテーブル名を取得
+    region = os.getenv('AWS_REGION', 'ap-northeast-1')  # リージョンが未設定の場合、デフォルト値を使用
+    table_name = os.getenv('TABLE_NAME_BOARD')  # テーブル名が未設定の場合、デフォルト値を使用
+
+    # DynamoDBリソースを初期化
+    dynamodb = boto3.resource('dynamodb', region_name=region)
+
+    # テーブルを返す
+    return dynamodb.Table(table_name)
+
+@cache.memoize(timeout=900)
+def get_participants_info(schedule): 
+    participants_info = []
+    try:
+        user_table = app.dynamodb.Table(app.table_name)
+        
+        if 'participants' in schedule and schedule['participants']:
+            for participant_id in schedule['participants']:
+                try:
+                    scan_response = user_table.scan(
+                        FilterExpression='contains(#uid, :pid)',
+                        ExpressionAttributeNames={
+                            '#uid': 'user#user_id'
+                        },
+                        ExpressionAttributeValues={
+                            ':pid': participant_id
+                        }
+                    )
+                    
+                    if scan_response.get('Items'):
+                        user = scan_response['Items'][0]
+                        participants_info.append({
+                            'user_id': participant_id,
+                            'display_name': user.get('display_name', '名前なし'),
+                            'experience': user.get('badminton_experience', '未設定')
+                        })
+                except Exception as e:
+                    app.logger.error(f"参加者情報の取得中にエラー: {str(e)}")
+                    
+    except Exception as e:
+        app.logger.error(f"参加者情報の取得中にエラー: {str(e)}")
+        
+    return participants_info
+
+
+@cache.memoize(timeout=900)
+def get_schedules_with_formatting():
+    logger.debug("Checking cache for schedules")
+    
+    schedule_table = get_schedule_table()
+    user_table = app.dynamodb.Table(app.table_name)
+    
+    response = schedule_table.scan()
+    schedules = []
+    
+    for schedule in response.get('Items', []):
+        date_obj = parser.parse(schedule['date'])
+        formatted_date = f"{date_obj.month}月{date_obj.day}日"
+        schedule['formatted_date'] = formatted_date
+        
+        print(f"Schedule ID: {schedule.get('schedule_id')}")
+        print(f"Participants: {schedule.get('participants', [])}")
+        
+        participants_info = []
+        if 'participants' in schedule and schedule['participants']:
+            try:
+                for participant_id in schedule['participants']:
+                    # user#プレフィックスを追加
+                    user_key = f"user#{participant_id}"
+                    user_response = user_table.get_item(
+                        Key={
+                            'user#user_id': user_key  # キー名も正しいものに修正
+                        }
+                    )
+                    if 'Item' in user_response:
+                        user = user_response['Item']
+                        print(f"Found user: {user.get('display_name')}")
+                        participants_info.append({
+                            'user_id': participant_id,
+                            'display_name': user.get('display_name', '名前なし')
+                        })
+                    else:
+                        print(f"User not found: {user_key}")
+            except Exception as e:
+                print(f"Error getting user info: {str(e)}")
+                logger.error(f"参加者情報の取得中にエラーが発生: {str(e)}")
+        
+        schedule['participants_info'] = participants_info
+        print(f"Final participants_info: {participants_info}")
+        schedules.append(schedule)
+    
+    return schedules
+
+@app.template_filter('format_date')
+def format_date(value):
+    """日付を 'MM/DD' 形式にフォーマット"""
+    try:
+        date_obj = datetime.fromisoformat(value)  # ISO 形式から日付オブジェクトに変換
+        return date_obj.strftime('%m/%d')        # MM/DD フォーマットに変換
+    except ValueError:
+        return value  # 変換できない場合はそのまま返す
+    
+
+@app.route("/", methods=['GET', 'POST'])
+def index():
+    form = ScheduleForm()
+    if form.validate_on_submit():
+        try:
+            schedule_table = get_schedule_table()
+            if not schedule_table:
+                raise ValueError("Schedule table is not initialized")
+
+            schedule_data = {
+                'schedule_id': str(uuid.uuid4()),
+                'date': form.date.data.isoformat(),
+                'day_of_week': form.day_of_week.data,
+                'venue': form.venue.data,
+                'start_time': form.start_time.data,        # そのまま HH:MM 形式で保存
+                'end_time': form.end_time.data,           # そのまま HH:MM 形式で保存
+                'created_at': datetime.now().isoformat(),                
+                'status': 'active'
+            }            
+
+            schedule_table.put_item(Item=schedule_data)
+            cache.delete_memoized(get_schedules_with_formatting)
+            flash('スケジュールが登録されました', 'success')
+            return redirect(url_for('index'))
+
+        except Exception as e:           
+            flash('スケジュールの登録中にエラーが発生しました', 'error')
+
+    # スケジュール一覧の取得とソート
+    try:
+        schedules = get_schedules_with_formatting()
+        schedules = sorted(schedules, key=lambda x: (x['date'], x['start_time']))
+
+# 各スケジュールに参加者情報を追加
+        for schedule in schedules:
+            schedule['participants_info'] = get_participants_info(schedule)
+
+    except Exception as e:        
+        schedules = []    
+
+    return render_template(
+        "index.html",
+        form=form,
+        schedules=schedules,
+        title="鶯 | 越谷市バドミントンサークル",
+        description="越谷市で活動しているバドミントンサークルです。経験者から初心者まで楽しく活動中。見学・体験随時募集中。",    
+        canonical=url_for('index', _external=True)
+    )
+
+
 
 
 @app.route('/temp_register', methods=['GET', 'POST'])
@@ -366,15 +825,6 @@ def temp_register():
             flash(f"登録中にエラーが発生しました: {str(e)}", 'danger')
 
     return render_template('temp_register.html', form=form) 
-
-def get_participation_table():
-    """参加データテーブルを取得する関数"""
-    try:
-        table = app.dynamodb.Table('app.table_name_schedule')  # テーブル名は適切に設定してください
-        return table
-    except Exception as e:
-        app.logger.error(f"Error getting participation table: {e}")
-        return None
 
 
 @app.route('/schedule/<string:schedule_id>/join', methods=['POST'])
@@ -446,319 +896,6 @@ def join_schedule(schedule_id):
         return redirect(url_for('index'))
 
 
-class User(UserMixin):
-    def __init__(self, user_id, display_name, user_name, furigana, email, password_hash,
-                 gender, date_of_birth, post_code, address, phone, guardian_name, emergency_phone, 
-                 organization='other', administrator=False, 
-                 created_at=None, updated_at=None):
-        super().__init__()
-        self.id = user_id
-        self.display_name = display_name
-        self.user_name = user_name
-        self.furigana = furigana
-        self.email = email 
-        self._password_hash = password_hash
-        self.gender = gender
-        self.date_of_birth = date_of_birth
-        self.post_code = post_code
-        self.address = address
-        self.phone = phone
-        self.guardian_name = guardian_name 
-        self.emergency_phone = emergency_phone 
-        self.organization = organization
-        self.administrator = administrator
-        self.created_at = created_at or datetime.now().isoformat()
-        self.updated_at = updated_at or datetime.now().isoformat()
-
-    def check_password(self, password):
-        return check_password_hash(self._password_hash, password)  # _password_hashを使用
-
-    @property
-    def is_admin(self):
-        return self.administrator    
-   
-
-    @staticmethod
-    def from_dynamodb_item(item):
-        def get_value(field, default=None):
-            return item.get(field, default)
-
-        return User(
-            user_id=get_value('user#user_id'),
-            display_name=get_value('display_name'),
-            user_name=get_value('user_name'),
-            furigana=get_value('furigana'),
-            email=get_value('email'),
-            password_hash=get_value('password'),  # 修正：password フィールドを取得
-            gender=get_value('gender'),
-            date_of_birth=get_value('date_of_birth'),
-            post_code=get_value('post_code'),
-            address=get_value('address'),
-            phone=get_value('phone'),
-            guardian_name=get_value('guardian_name', default=None),
-            emergency_phone=get_value('emergency_phone', default=None),
-            organization=get_value('organization', default='other'),
-            administrator=bool(get_value('administrator', False)),
-            created_at=get_value('created_at'),
-            updated_at=get_value('updated_at')
-        )
-
-    def to_dynamodb_item(self):
-        fields = ['user_id', 'organization', 'address', 'administrator', 'created_at', 
-                  'display_name', 'email', 'furigana', 'gender', 'password', 
-                  'phone', 'post_code', 'updated_at', 'user_name','guardian_name', 'emergency_phone']
-        item = {field: {"S": str(getattr(self, field))} for field in fields if getattr(self, field, None)}
-        item['administrator'] = {"BOOL": self.administrator}
-        if self.date_of_birth:
-            item['date_of_birth'] = {"S": str(self.date_of_birth)}
-        return item
-
-
-def get_user_from_dynamodb(user_id):
-    try:
-        # DynamoDBからユーザーデータを取得
-        response = app.dynamodb.get_item(
-            TableName=app.table_name,
-            Key={"user#user_id": {"S": user_id}}
-            
-        )
-        
-        # データが存在しない場合
-        if 'Item' not in response:
-            app.logger.info(f"User not found in DynamoDB for user_id: {user_id}")
-            return None
-
-        item = response['Item']
-
-        # DynamoDBのデータをUserクラスのインスタンスに変換
-        user = User.from_dynamodb_item(item)
-        app.logger.debug(f"User successfully loaded for user_id: {user_id}")
-        return user
-
-    except Exception as e:
-        app.logger.error(f"Error fetching user from DynamoDB for user_id: {user_id}: {str(e)}", exc_info=True)
-        return None  
-
-class LoginForm(FlaskForm):
-    email = StringField('メールアドレス', validators=[DataRequired(message='メールアドレスを入力してください'), Email(message='正しいメールアドレスの形式で入力してください')])
-    password = PasswordField('パスワード', validators=[DataRequired(message='パスワードを入力してください')])
-    remember = BooleanField('ログイン状態を保持する')
-    submit = SubmitField('ログイン')
-
-    def __init__(self, *args, **kwargs):
-        super(LoginForm, self).__init__(*args, **kwargs)
-        self.user = None  # self.userを初期化
-
-    def validate_email(self, field):
-        """メールアドレスの存在確認"""
-        try:
-            # メールアドレスでユーザーを検索
-            response = app.table.query(
-                IndexName='email-index',
-                KeyConditionExpression='email = :email',
-                ExpressionAttributeValues={
-                    ':email': field.data
-                }
-            )
-            
-            items = response.get('Items', [])
-            if not items:
-                raise ValidationError('このメールアドレスは登録されていません')            
-            
-            # ユーザー情報を保存（パスワード検証で使用）
-            self.user = items[0]
-            # ユーザーをロード
-            app.logger.debug(f"User found for email: {field.data}")       
-           
-        
-        except Exception as e:
-            app.logger.error(f"Login error: {e}")
-            raise ValidationError('ログイン処理中にエラーが発生しました')
-
-    def validate_password(self, field):
-        """パスワードの検証"""
-        if not self.user:
-            raise ValidationError('先にメールアドレスを確認してください')
-
-        stored_hash = self.user.get('password')
-        app.logger.debug(f"Retrieved user: {self.user}")
-        app.logger.debug(f"Stored hash: {stored_hash}")
-        if not stored_hash:
-            app.logger.error("No password hash found in user data")
-            raise ValidationError('登録情報が正しくありません')
-
-        app.logger.debug("Validating password against stored hash")
-        if not check_password_hash(stored_hash, field.data):
-            app.logger.debug("Password validation failed")
-            raise ValidationError('パスワードが正しくありません')
-
-
-class ScheduleForm(FlaskForm):
-    date = DateField('日付', validators=[DataRequired()])
-    day_of_week = StringField('曜日', render_kw={'readonly': True})  # 自動入力用
-    
-    venue = SelectField('会場', validators=[DataRequired()], choices=[
-        ('', '選択してください'),
-        ('北越谷 A面', '北越谷 A面'),
-        ('北越谷 B面', '北越谷 B面'),
-        ('北越谷 AB面', '北越谷 AB面'),
-        ('越谷総合体育館 第1 2面', '越谷総合体育館 第1 2面'),
-        ('越谷総合体育館 第1 6面', '越谷総合体育館 第1 6面'),
-        ('ウィングハット', 'ウィングハット')
-    ])
-    
-    start_time = SelectField('開始時間', validators=[DataRequired()], choices=[
-        ('', '選択してください')] + 
-        [(f"{h:02d}:00", f"{h:02d}:00") for h in range(9, 23)]
-    )
-    
-    end_time = SelectField('終了時間', validators=[DataRequired()], choices=[
-        ('', '選択してください')] + 
-        [(f"{h:02d}:00", f"{h:02d}:00") for h in range(10, 24)]
-    )
-    
-    submit = SubmitField('登録')
-
-class Board_Form(FlaskForm):
-    title = StringField('タイトル', 
-        validators=[
-            DataRequired(message='タイトルを入力してください'),
-            Length(max=100, message='タイトルは100文字以内で入力してください')
-        ])
-    
-    content = TextAreaField('内容', 
-        validators=[
-            DataRequired(message='内容を入力してください'),
-            Length(max=2000, message='内容は2000文字以内で入力してください')
-        ])
-    
-    admin_memo = TextAreaField('管理者用メモ', validators=[Optional()])  # 追加
-    
-    image = FileField('ファイル', 
-        validators=[
-            FileAllowed(
-                ['jpg', 'jpeg', 'png', 'gif', 'pdf'],
-                'jpg, jpeg, png, gif, pdfファイルのみアップロード可能です'
-            ),
-            FileSize(max_size=5 * 1024 * 1024, message='ファイルサイズは5MB以内にしてください')  # 5MB制限
-        ])
-    
-    remove_image = BooleanField('画像を削除する')
-    
-    submit = SubmitField('投稿する')
-
-    def validate_image(self, field):
-        if field.data:
-            filename = field.data.filename.lower()
-            if not any(filename.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.pdf']):
-                raise ValidationError('許可されていないファイル形式です')
-
-def get_schedule_table():
-    dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')  # 必要に応じてリージョンを変更
-    return dynamodb.Table('bad-schedule')
-
-
-@app.route("/", methods=['GET', 'POST'])
-def index():
-    form = ScheduleForm()
-    if form.validate_on_submit():
-        try:
-            schedule_table = get_schedule_table()
-            if not schedule_table:
-                raise ValueError("Schedule table is not initialized")
-
-            schedule_data = {
-                'schedule_id': str(uuid.uuid4()),
-                'date': form.date.data.isoformat(),
-                'day_of_week': form.day_of_week.data,
-                'venue': form.venue.data,
-                'start_time': form.start_time.data,        # そのまま HH:MM 形式で保存
-                'end_time': form.end_time.data,           # そのまま HH:MM 形式で保存
-                'created_at': datetime.now().isoformat(),                
-                'status': 'active'
-            }            
-
-            schedule_table.put_item(Item=schedule_data)
-            cache.delete_memoized(get_schedules_with_formatting)
-            flash('スケジュールが登録されました', 'success')
-            return redirect(url_for('index'))
-
-        except Exception as e:           
-            flash('スケジュールの登録中にエラーが発生しました', 'error')
-
-    # スケジュール一覧の取得とソート
-    try:
-        schedules = get_schedules_with_formatting()
-        schedules = sorted(schedules, key=lambda x: (x['date'], x['start_time']))
-    except Exception as e:        
-        schedules = []    
-
-    return render_template(
-        "index.html",
-        form=form,
-        schedules=schedules,
-        title="鶯 | 越谷市バドミントンサークル",
-        description="越谷市で活動しているバドミントンサークルです。経験者から初心者まで楽しく活動中。見学・体験随時募集中。",    
-        canonical=url_for('index', _external=True)
-    )
-
-@cache.memoize(timeout=0000)
-def get_schedules_with_formatting():
-    logger.debug("Checking cache for schedules")
-    
-    schedule_table = get_schedule_table()
-    user_table = app.dynamodb.Table(app.table_name)
-    
-    response = schedule_table.scan()
-    schedules = []
-    
-    for schedule in response.get('Items', []):
-        date_obj = parser.parse(schedule['date'])
-        formatted_date = f"{date_obj.month}月{date_obj.day}日"
-        schedule['formatted_date'] = formatted_date
-        
-        print(f"Schedule ID: {schedule.get('schedule_id')}")
-        print(f"Participants: {schedule.get('participants', [])}")
-        
-        participants_info = []
-        if 'participants' in schedule and schedule['participants']:
-            try:
-                for participant_id in schedule['participants']:
-                    # user#プレフィックスを追加
-                    user_key = f"user#{participant_id}"
-                    user_response = user_table.get_item(
-                        Key={
-                            'user#user_id': user_key  # キー名も正しいものに修正
-                        }
-                    )
-                    if 'Item' in user_response:
-                        user = user_response['Item']
-                        print(f"Found user: {user.get('display_name')}")
-                        participants_info.append({
-                            'user_id': participant_id,
-                            'display_name': user.get('display_name', '名前なし')
-                        })
-                    else:
-                        print(f"User not found: {user_key}")
-            except Exception as e:
-                print(f"Error getting user info: {str(e)}")
-                logger.error(f"参加者情報の取得中にエラーが発生: {str(e)}")
-        
-        schedule['participants_info'] = participants_info
-        print(f"Final participants_info: {participants_info}")
-        schedules.append(schedule)
-    
-    return schedules
-
-@app.template_filter('format_date')
-def format_date(value):
-    """日付を 'MM/DD' 形式にフォーマット"""
-    try:
-        date_obj = datetime.fromisoformat(value)  # ISO 形式から日付オブジェクトに変換
-        return date_obj.strftime('%m/%d')        # MM/DD フォーマットに変換
-    except ValueError:
-        return value  # 変換できない場合はそのまま返す
-
 @app.route('/clear-cache')
 def clear_cache():
     try:
@@ -797,8 +934,7 @@ def signup():
 
             app.table.put_item(
                 Item={
-                    "user#user_id": user_id,  # 注意: DynamoDBリソースAPIではデータ型を指定する必要がありません
-                    "organization": form.organization.data,
+                    "user#user_id": user_id,                    
                     "address": form.address.data,
                     "administrator": False,
                     "created_at": current_time,
@@ -813,9 +949,13 @@ def signup():
                     "updated_at": current_time,
                     "user_name": form.user_name.data,
                     "guardian_name": form.guardian_name.data,
-                    "emergency_phone": form.emergency_phone.data
+                    "emergency_phone": form.emergency_phone.data,
+                    "badminton_experience": form.badminton_experience.data,
+                    "organization": form.organization.data,
                 },
-                ConditionExpression='attribute_not_exists(user_id)'
+                ConditionExpression='attribute_not_exists(#user_id)',
+                ExpressionAttributeNames={ "#user_id": "user#user_id"
+                }
             )
             
 
@@ -901,7 +1041,11 @@ def login():
                     phone=user_data.get('phone', None),
                     guardian_name=user_data.get('guardian_name', None),  
                     emergency_phone=user_data.get('emergency_phone', None), 
-                    administrator=user_data['administrator']
+                    badminton_experience=user_data.get('badminton_experience', None),
+                    administrator=user_data['administrator'],
+                    organization=user_data.get('organization', 'other')
+                    
+                    
                 )
                                 
             except KeyError as e:
@@ -944,89 +1088,12 @@ def is_safe_url(target):
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
-# セキュアなリダイレクト先かチェックする関数
-def is_safe_url(target):
-    ref_url = urlparse(request.host_url)
-    test_url = urlparse(urljoin(request.host_url, target))
-    return test_url.scheme in ('http', 'https') and \
-           ref_url.netloc == test_url.netloc
-
         
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     return redirect("/")
-
-def get_schedule_table():
-    # デバッグログを追加
-    region = os.getenv('AWS_REGION')
-    table_name = os.getenv('TABLE_NAME_SCHEDULE')
-    
-    app.logger.debug(f"Region: {region}")
-    app.logger.debug(f"Table name: {table_name}")
-    
-    dynamodb = boto3.resource('dynamodb', region_name=region)
-    return dynamodb.Table(table_name) 
-
-@app.route("/schedule/<string:schedule_id>", methods=["GET"])
-def schedule_detail(schedule_id):
-    try:
-        schedule_table = get_schedule_table()
-        user_table = app.dynamodb.Table(app.table_name)
-        
-        # テーブル構造を確認
-        table_description = user_table.meta.client.describe_table(
-            TableName=app.table_name
-        )
-        print(f"Table structure: {table_description['Table']['KeySchema']}")
-        
-        response = schedule_table.get_item(
-            Key={
-                'schedule_id': schedule_id
-            }
-        )
-        
-        schedule = response.get('Item')
-        if not schedule:
-            abort(404)
-            
-        print(f"Schedule participants: {schedule.get('participants', [])}")
-        
-        participants_info = []
-        if 'participants' in schedule and schedule['participants']:
-            for participant_id in schedule['participants']:
-                try:
-                    # まずscanでユーザー情報を探してみる
-                    scan_response = user_table.scan(
-                        FilterExpression='contains(#uid, :pid)',
-                        ExpressionAttributeNames={
-                            '#uid': 'user#user_id'
-                        },
-                        ExpressionAttributeValues={
-                            ':pid': participant_id
-                        }
-                    )
-                    print(f"Scan response: {scan_response}")  # デバッグ出力
-                    
-                    if scan_response.get('Items'):
-                        user = scan_response['Items'][0]
-                        participants_info.append({
-                            'user_id': participant_id,
-                            'display_name': user.get('display_name', '名前なし'),
-                            'experience': user.get('badminton_experience', '未設定')
-                        })
-                except Exception as e:
-                    print(f"Error details: {str(e)}")
-                    app.logger.error(f"参加者情報の取得中にエラー: {str(e)}")
-        
-        schedule['participants_info'] = participants_info
-        print(f"Final participants_info: {participants_info}")  # デバッグ出力
-        return render_template("schedule_detail.html", schedule=schedule)
-        
-    except Exception as e:
-        app.logger.error(f"スケジュール詳細の取得中にエラー: {str(e)}")
-        abort(500)
 
 
 @app.route("/edit_schedule/<schedule_id>", methods=['GET', 'POST'])
@@ -1185,6 +1252,7 @@ def account(user_id):
             form.phone.data = user.get('phone', None)            
             form.post_code.data = user.get('post_code', None)            
             form.address.data = user.get('address', None)
+            form.badminton_experience.data = user.get('badminton_experience', None)
             form.gender.data = user['gender']
             try:
                 form.date_of_birth.data = datetime.strptime(user['date_of_birth'], '%Y-%m-%d')
@@ -1196,10 +1264,7 @@ def account(user_id):
             form.emergency_phone.data = user.get('emergency_phone', '')
             return render_template('account.html', form=form, user=user)
 
-        if request.method == 'POST' and form.validate_on_submit():
-            app.logger.debug("Form validation passed.")
-            app.logger.debug(f"Form data: {form.data}")
-
+        if request.method == 'POST' and form.validate_on_submit():            
             current_time = datetime.now().isoformat()
             update_expression_parts = []
             expression_values = {}
@@ -1215,7 +1280,8 @@ def account(user_id):
                 ('gender', 'gender'),
                 ('organization', 'organization'),
                 ('guardian_name', 'guardian_name'),
-                ('emergency_phone', 'emergency_phone')
+                ('emergency_phone', 'emergency_phone'),
+                ('badminton_experience', 'badminton_experience')
             ]
 
             for field_name, db_field in fields_to_update:
@@ -1231,16 +1297,16 @@ def account(user_id):
 
             if form.password.data:
                 hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256')
-                if hashed_password != user.get('password'):  # 現在の値と異なる場合のみ更新
+                if hashed_password != user.get('password'):
                     update_expression_parts.append("password = :password")
                     expression_values[':password'] = hashed_password
-                    app.logger.debug(f"Password updated to: {hashed_password}")
 
+            # 更新日時は常に更新
             update_expression_parts.append("updated_at = :updated_at")
             expression_values[':updated_at'] = current_time
 
-            if update_expression_parts:
-                try:
+            try:
+                if update_expression_parts:
                     update_expression = "SET " + ", ".join(update_expression_parts)
                     app.logger.debug(f"Final update expression: {update_expression}")
                     response = table.update_item(
@@ -1250,23 +1316,24 @@ def account(user_id):
                         ReturnValues="ALL_NEW"
                     )
                     app.logger.info(f"User {user_id} updated successfully: {response}")
-                    updated_user = table.get_item(Key={'user#user_id': user_id}, ConsistentRead=True).get('Item')
-                    app.logger.debug(f"Updated user data: {updated_user}")
-                except Exception as e:
-                    app.logger.error(f"Error updating user in DynamoDB for user {user_id}: {e}", exc_info=True)
-                    flash('データベースの更新中にエラーが発生しました。', 'error')
-                    return redirect(url_for('account', user_id=user_id))
+                    flash('プロフィールが更新されました。', 'success')
+                else:
+                    flash('更新する項目がありません。', 'info')
+                
+                return redirect(url_for('account', user_id=user_id)) 
+            except ClientError as e:
+                # DynamoDB クライアントエラーの場合
+                error_code = e.response['Error']['Code']
+                error_message = e.response['Error']['Message']
+                app.logger.error(f"DynamoDB ClientError in account route for user {user_id}: {error_message} (Code: {error_code})", exc_info=True)
+                flash(f'DynamoDBでエラーが発生しました: {error_message}', 'error')       
 
-            flash('更新する項目がありません。', 'info')
-            return redirect(url_for('account', user_id=user_id))
+            except Exception as e:                
+                app.logger.error(f"Unexpected error in account route for user {user_id}: {e}", exc_info=True)
+                flash('予期せぬエラーが発生しました。', 'error')
+                return redirect(url_for('index'))
 
-        app.logger.debug(f"Validation failed. Errors: {form.errors}")
-        for field, errors in form.errors.items():
-            app.logger.debug(f"Field: {field}, Errors: {errors}")
-        flash('入力内容にエラーがあります。修正してください。', 'error')
-        return render_template('account.html', form=form, user=user)
-
-    except Exception as e:
+    except Exception as e:        
         app.logger.error(f"Unexpected error in account route for user {user_id}: {e}", exc_info=True)
         flash('予期せぬエラーが発生しました。', 'error')
         return redirect(url_for('index'))
@@ -1275,10 +1342,11 @@ def account(user_id):
 @app.route("/delete_user/<string:user_id>")
 def delete_user(user_id):
     try:
-        response = app.dynamodb.get_item(
+        table = app.dynamodb.Table(app.table_name)
+        response = table.get_item(
             TableName=app.table_name,
             Key={
-                'user#user_id': {'S': user_id}
+                'user#user_id': user_id
             }
         )
         user = response.get('Item')
@@ -1287,20 +1355,24 @@ def delete_user(user_id):
             flash('ユーザーが見つかりません。', 'error')
             return redirect(url_for('user_maintenance'))
             
-        # 管理者のみ削除可能
-        if not current_user.administrator:
+          # 削除権限を確認（本人または管理者のみ許可）
+        if current_user.id != user_id and not current_user.administrator:
+            app.logger.warning(f"Unauthorized delete attempt by user {current_user.id} for user {user_id}.")
             abort(403)  # 権限がない場合は403エラー
         
         # ここで実際の削除処理を実行
-        app.dynamodb.delete_item(
-            TableName=app.table_name,
-            Key={
-                'user#user_id': {'S': user_id}
-            }
-        )
+        table = app.dynamodb.Table(app.table_name)
+        table.delete_item(Key={'user#user_id': user_id})
+
+         # ログイン中のユーザーが削除対象の場合はログアウト
+        if current_user.id == user_id:
+            logout_user()
+            flash('アカウントが削除されました。再度ログインしてください。', 'info')
+            return redirect(url_for('login'))
 
         flash('ユーザーアカウントが削除されました', 'success')
         return redirect(url_for('user_maintenance'))
+
     except ClientError as e:
         app.logger.error(f"DynamoDB error: {str(e)}")
         flash('データベースエラーが発生しました。', 'error')
@@ -1389,24 +1461,6 @@ def delete_image(filename):
     except Exception as e:
         print(f"Error deleting {filename}: {e}")
         return "Error deleting the image", 500
-    
-
-
-
-def get_board_table():
-    """
-    DynamoDB テーブルを取得する関数。
-    テーブル名とリージョンは環境変数を使用して設定。
-    """
-    # 環境変数からリージョンとテーブル名を取得
-    region = os.getenv('AWS_REGION', 'ap-northeast-1')  # リージョンが未設定の場合、デフォルト値を使用
-    table_name = os.getenv('TABLE_NAME_BOARD')  # テーブル名が未設定の場合、デフォルト値を使用
-
-    # DynamoDBリソースを初期化
-    dynamodb = boto3.resource('dynamodb', region_name=region)
-
-    # テーブルを返す
-    return dynamodb.Table(table_name)
 
 
 @app.route('/board', methods=['GET', 'POST'])
